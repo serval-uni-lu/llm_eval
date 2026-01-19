@@ -1,0 +1,36 @@
+# Core ML/AI frameworks
+torch>=2.7.0
+transformers>=4.53.0
+accelerate>=1.10.0
+safetensors>=0.6.0
+bitsandbytes>=0.46.0
+
+# Document processing
+docling>=2.47.0
+docling-core>=2.45.0
+docling-ibm-models>=3.9.0
+docling-parse>=4.2.0
+
+# Text chunking
+chonkie>=1.1.0
+
+# Data processing
+pandas>=2.3.0
+numpy>=2.3.0
+datasets>=4.0.0
+pyarrow>=21.0.0
+
+# Configuration and validation
+pydantic>=2.11.0
+pydantic-settings>=2.10.0
+pyyaml>=6.0.0
+
+# Utilities
+loguru>=0.7.0
+huggingface-hub>=0.34.0
+tqdm>=4.67.0
+
+# Tokenizers
+tokenizers>=0.21.0
+sentencepiece>=0.2.0
+tiktoken>=0.11.0

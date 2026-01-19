@@ -1,0 +1,42 @@
+name: exp3212
+
+models:
+
+- name: Qwen/Qwen3-4B-Instruct-2507
+  sampling_params:
+    temperature: 0.7
+
+- name: ibm-granite/granite-4.0-micro
+  sampling_params:
+    temperature: 0.6
+
+- name: HuggingFaceTB/SmolLM3-3B
+  sampling_params:
+    temperature: 0.6
+
+datasets:
+
+- name: airbench
+  metrics:
+  - safety
+
+- name: bbq
+  metrics:
+  - bias
+  - contains
+
+- name: financebench
+  metrics:
+  - answer_correctness
+  - factual_accuracy
+
+- name: secque
+  metrics:
+  - answer_correctness
+  - factual_accuracy
+
+judge_model:
+
+  name: google/gemma-3-4b-it
+  sampling_params:
+    temperature: 0.4

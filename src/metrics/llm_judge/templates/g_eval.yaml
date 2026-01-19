@@ -1,0 +1,50 @@
+no_reference: |
+  You are a fair and impartial evaluator. Your role is to evaluate a model's response based on a given task and specific criteria.
+
+  *** TASK INTRODUCTION:
+  {{task_introduction}}
+
+  *** EVALUATION CRITERIA:
+  {{evaluation_criteria}}
+
+  *** CHAIN OF THOUGHT STEPS:
+  {{chain_of_thought}}
+
+  *** QUESTION:
+  {{input}}
+  
+  *** ANSWER TO EVALUATE:
+  {{output}}
+
+  *** INSTRUCTIONS:
+  Based on your reasoning process, provide a single numeric score from 0 to 5 and a brief justification (1-2 sentences).
+  Return ONLY a JSON object with the keys "score" and "reason".
+
+  *** EVALUATION:
+
+with_reference: |
+  You are a fair and impartial evaluator. Your role is to evaluate a model's response based on a given task, specific criteria, and a reference answer.
+
+  *** TASK INTRODUCTION:
+  {{task_introduction}}
+
+  *** EVALUATION CRITERIA:
+  {{evaluation_criteria}}
+
+  *** CHAIN OF THOUGHT STEPS:
+  {{chain_of_thought}}
+
+  *** QUESTION:
+  {{input}}
+
+  *** REFERENCE ANSWER:
+  {{reference}}
+
+  *** ANSWER TO EVALUATE:
+  {{output}}
+
+  *** INSTRUCTIONS:
+  Based on your reasoning process, provide a single numeric score from 0 to 5 and a brief justification (1-2 sentences).
+  Return ONLY a JSON object with the keys "score" and "reason".
+
+  *** EVALUATION:

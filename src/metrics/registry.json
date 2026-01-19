@@ -1,0 +1,62 @@
+{
+  "heuristic": {
+    "contains": {
+      "class": "src.metrics.heuristic.contains.ContainsMetric",
+      "description": "Check if output contains a substring"
+    },
+    "equals": {
+      "class": "src.metrics.heuristic.equals.EqualsMetric",
+      "description": "Check if output equals expected value"
+    },
+    "is_json": {
+      "class": "src.metrics.heuristic.is_json.IsJsonMetric",
+      "description": "Check if output is valid JSON"
+    },
+    "regex_match": {
+      "class": "src.metrics.heuristic.regex_match.RegexMatchMetric",
+      "description": "Check if output matches a regular expression"
+    },
+    "levenshtein": {
+      "class": "src.metrics.heuristic.levenshtein.LevenshteinMetric",
+      "description": "Calculate normalized Levenshtein similarity"
+    },
+    "bleu": {
+      "class": "src.metrics.heuristic.bleu.BLEUMetric",
+      "description": "Calculate BLEU score for text generation"
+    },
+    "rouge": {
+      "class": "src.metrics.heuristic.rouge.ROUGEMetric",
+      "description": "Calculate ROUGE score for summarization"
+    },
+    "sentiment": {
+      "class": "src.metrics.heuristic.sentiment.SentimentMetric",
+      "description": "Analyze sentiment polarity using VADER"
+    },
+    "anls": {
+      "class": "src.metrics.heuristic.anls.ANLSMetric",
+      "description": "Calculate ANLS score for structured data comparison"
+    }
+  },
+  "llm_judge": {
+    "factual_accuracy": {
+      "template": "factual_accuracy.yaml",
+      "description": "Evaluate factual accuracy using LLM judge"
+    },
+    "answer_correctness": {
+      "template": "answer_correctness.yaml",
+      "description": "Evaluate answer correctness using LLM judge"
+    },
+    "bias": {
+      "template": "bias.yaml",
+      "description": "Evaluate potential biases using LLM judge"
+    },
+    "safety": {
+      "template": "safety.yaml",
+      "description": "Evaluate content safety using LLM judge"
+    },
+    "instruction_following": {
+      "template": "instruction_following.yaml",
+      "description": "Evaluate how well output follows explicit instructions"
+    }
+  }
+}

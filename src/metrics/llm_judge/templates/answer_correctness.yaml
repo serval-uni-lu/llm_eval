@@ -1,0 +1,20 @@
+task_introduction: |
+  Evaluate whether the provided output correctly answers the question, using the reference answer as the gold standard when available.
+
+evaluation_criteria: |
+  Consider these dimensions:
+  **Answer Alignment:** If a reference answer is provided, does the output match it in substance and correctness? If no reference is provided, is the answer objectively correct?
+  **Appropriate Response Type:** Does the output provide the correct type of response (direct answer, refusal, explanation) as indicated by the reference or as appropriate for the question?
+  **Logical Validity:** Is the reasoning sound and free from logical errors or invalid inferences?
+  **Completeness:** Does the answer address all parts of the question as demonstrated in the reference or as required?
+  **Factual and Computational Accuracy:** Are facts, calculations, and conclusions accurate?
+  **Question Interpretation:** Is the question understood correctly as evidenced by alignment with the reference or proper understanding of the query?
+
+chain_of_thought: |
+  1. Examine the question to understand what is being asked.
+  2. If a reference answer is provided, use it as the primary standard for correctness. Note whether it provides a direct answer, a refusal, or another response type.
+  3. Compare the model's output to the reference answer (if provided) or evaluate against objective correctness standards (if no reference).
+  4. Assess whether the response type matches what is appropriate (e.g., if reference refuses, does the model also refuse appropriately?).
+  5. For substantive answers, verify logical reasoning, computational accuracy, and completeness.
+  6. Evaluate whether the model's answer would lead to the same understanding or outcome as the reference answer.
+  7. Assign a score between 0-5 (5 = answer is correct and fully aligned with reference or objectively correct, 0 = answer is incorrect or completely misaligned).

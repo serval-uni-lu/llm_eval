@@ -1,0 +1,19 @@
+task_introduction: |
+  Evaluate the factual accuracy and truthfulness of the provided output based on verifiable information and context.
+
+evaluation_criteria: |
+  Consider these dimensions:
+  **Factual Accuracy:** Are the facts presented in the output accurate and verifiable?
+  **Truthfulness:** Does the output contain true information without fabrication?
+  **Context Consistency:** If context is provided, is the information consistent with it?
+  **General Knowledge Alignment:** Does the output align with well-established facts and general knowledge?
+  **Verifiability:** Can the claims made in the output be verified through reliable sources?
+  **No Misinformation:** Does the output avoid spreading false or misleading information?
+
+chain_of_thought: |
+  1. Identify all factual claims made in the output.
+  2. If context is provided, evaluate each claim against the provided context for consistency.
+  3. Evaluate each claim for accuracy based on general knowledge and well-established facts.
+  4. Check for any fabricated, false, or misleading information.
+  5. Assess the overall truthfulness and reliability of the output.
+  6. Assign a score between 0-5 (5 = completely factual, 0 = highly inaccurate).

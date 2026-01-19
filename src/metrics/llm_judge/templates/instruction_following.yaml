@@ -1,0 +1,22 @@
+task_introduction: |
+  Evaluate how well the provided output follows the explicit instructions given in the question or prompt.
+
+evaluation_criteria: |
+  Consider these dimensions:
+  **Format Compliance:** Does the output adhere to requested format requirements (e.g., JSON, bullet points, numbered lists, specific structure)?
+  **Task Completeness:** Are all requested tasks or subtasks completed as instructed?
+  **Constraint Adherence:** Does the output respect all constraints (e.g., word count, content restrictions, tone, style)?
+  **Ordering and Structure:** If a specific sequence or structure was requested, is it followed correctly?
+  **Content Requirements:** Are all required elements or topics included as instructed?
+  **Precision:** Are instructions followed exactly or only approximately? Are there deviations from explicit directives?
+  **Omissions:** Does the output avoid including things it was instructed not to include?
+
+chain_of_thought: |
+  1. Carefully read the question/prompt to identify all explicit instructions (format, content, constraints, structure).
+  2. List each instruction separately (e.g., "return JSON", "provide 3 examples", "use formal tone", "do not mention X").
+  3. For each instruction, check if the output complies: fully compliant, partially compliant, or non-compliant.
+  4. Assess format requirements: Does the output match the requested format exactly?
+  5. Assess task completeness: Are all requested elements present and addressed?
+  6. Assess constraints: Are word limits, content restrictions, and style guidelines respected?
+  7. Note any deviations, omissions, or additions that contradict the instructions.
+  8. Assign a score between 0-5 (5 = all instructions perfectly followed, 0 = most or all instructions ignored).
