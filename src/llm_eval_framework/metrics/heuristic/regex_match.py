@@ -1,7 +1,7 @@
 import re
 from typing import Union
 
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 
 class RegexMatchMetric(BaseMetric):
@@ -16,7 +16,9 @@ class RegexMatchMetric(BaseMetric):
         super().__init__(name="regex_match")
         self.pattern = re.compile(pattern) if isinstance(pattern, str) else pattern
 
-    def score(self, output: str, pattern: Union[str, re.Pattern] = None) -> MetricResult:
+    def score(
+        self, output: str, pattern: Union[str, re.Pattern] = None
+    ) -> MetricResult:
         """Check if output matches the regex pattern.
 
         Args:
@@ -29,7 +31,9 @@ class RegexMatchMetric(BaseMetric):
         pattern_to_use = pattern if pattern is not None else self.pattern
 
         if pattern_to_use is None:
-            raise ValueError("Pattern must be provided either in constructor or score()")
+            raise ValueError(
+                "Pattern must be provided either in constructor or score()"
+            )
 
         # Compile if string
         if isinstance(pattern_to_use, str):
@@ -39,5 +43,5 @@ class RegexMatchMetric(BaseMetric):
 
         return MetricResult(
             value=1.0 if matches else 0.0,
-            details=f"Pattern {'matched' if matches else 'did not match'} in output"
+            details=f"Pattern {'matched' if matches else 'did not match'} in output",
         )

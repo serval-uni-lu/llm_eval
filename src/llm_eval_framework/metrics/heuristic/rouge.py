@@ -1,7 +1,7 @@
 from typing import Union, List
 from rouge_score import rouge_scorer
 
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 
 class ROUGEMetric(BaseMetric):
@@ -17,11 +17,15 @@ class ROUGEMetric(BaseMetric):
         super().__init__(name="rouge")
 
         if rouge_scorer is None:
-            raise ImportError("rouge-score required for ROUGE. Install with: pip install rouge-score")
+            raise ImportError(
+                "rouge-score required for ROUGE. Install with: pip install rouge-score"
+            )
 
         valid_types = {"rouge1", "rouge2", "rougeL", "rougeLsum"}
         if rouge_type not in valid_types:
-            raise ValueError(f"Invalid rouge_type '{rouge_type}'. Must be one of {valid_types}")
+            raise ValueError(
+                f"Invalid rouge_type '{rouge_type}'. Must be one of {valid_types}"
+            )
 
         self.rouge_type = rouge_type
         self.scorer = rouge_scorer.RougeScorer([rouge_type], use_stemmer=use_stemmer)
@@ -57,6 +61,6 @@ class ROUGEMetric(BaseMetric):
             value=value,
             details={
                 "rouge_type": self.rouge_type,
-                "use_stemmer": self.scorer.use_stemmer
-            }
+                "use_stemmer": self.scorer.use_stemmer,
+            },
         )

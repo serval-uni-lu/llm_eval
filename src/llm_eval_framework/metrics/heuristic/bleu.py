@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 try:
     from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
@@ -12,7 +12,9 @@ except ImportError:
 class BLEUMetric(BaseMetric):
     """Metric that calculates BLEU score using NLTK."""
 
-    def __init__(self, n_grams: int = 4, smoothing: str = "method1", case_sensitive: bool = False):
+    def __init__(
+        self, n_grams: int = 4, smoothing: str = "method1", case_sensitive: bool = False
+    ):
         """Initialize BLEUMetric.
 
         Args:
@@ -28,7 +30,9 @@ class BLEUMetric(BaseMetric):
         self.n_grams = n_grams
         self.case_sensitive = case_sensitive
         self.weights = tuple(1.0 / n_grams for _ in range(n_grams))
-        self.smoothing_func = getattr(SmoothingFunction(), smoothing, SmoothingFunction().method1)
+        self.smoothing_func = getattr(
+            SmoothingFunction(), smoothing, SmoothingFunction().method1
+        )
 
     def score(self, output: str, reference: Union[str, List[str]]) -> MetricResult:
         """Calculate BLEU score between output and reference(s).
@@ -55,7 +59,9 @@ class BLEUMetric(BaseMetric):
             references = []
             for ref in reference:
                 if ref.strip():
-                    references.append(self._normalize_text(ref, self.case_sensitive).split())
+                    references.append(
+                        self._normalize_text(ref, self.case_sensitive).split()
+                    )
             if not references:
                 return MetricResult(value=0.0, details={"error": "No valid references"})
 
@@ -64,14 +70,16 @@ class BLEUMetric(BaseMetric):
                 references,
                 candidate,
                 weights=self.weights,
-                smoothing_function=self.smoothing_func
+                smoothing_function=self.smoothing_func,
             )
             return MetricResult(
                 value=bleu_score,
                 details={
                     "n_grams": self.n_grams,
-                    "case_sensitive": self.case_sensitive
-                }
+                    "case_sensitive": self.case_sensitive,
+                },
             )
         except ZeroDivisionError:
-            return MetricResult(value=0.0, details={"error": "ZeroDivisionError in BLEU calculation"})
+            return MetricResult(
+                value=0.0, details={"error": "ZeroDivisionError in BLEU calculation"}
+            )

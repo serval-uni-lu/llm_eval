@@ -1,6 +1,6 @@
 from rapidfuzz.distance import Indel
 
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 
 class LevenshteinMetric(BaseMetric):
@@ -15,7 +15,9 @@ class LevenshteinMetric(BaseMetric):
         super().__init__(name="levenshtein")
 
         if Indel is None:
-            raise ImportError("rapidfuzz required for Levenshtein. Install with: pip install rapidfuzz")
+            raise ImportError(
+                "rapidfuzz required for Levenshtein. Install with: pip install rapidfuzz"
+            )
 
         self.case_sensitive = case_sensitive
 
@@ -32,9 +34,10 @@ class LevenshteinMetric(BaseMetric):
         output_normalized = self._normalize_text(output, self.case_sensitive)
         reference_normalized = self._normalize_text(reference, self.case_sensitive)
 
-        similarity = Indel.normalized_similarity(output_normalized, reference_normalized)
+        similarity = Indel.normalized_similarity(
+            output_normalized, reference_normalized
+        )
 
         return MetricResult(
-            value=similarity,
-            details={"case_sensitive": self.case_sensitive}
+            value=similarity, details={"case_sensitive": self.case_sensitive}
         )

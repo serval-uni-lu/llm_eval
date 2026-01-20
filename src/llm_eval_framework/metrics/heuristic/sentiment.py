@@ -1,7 +1,7 @@
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 
 class SentimentMetric(BaseMetric):
@@ -12,7 +12,9 @@ class SentimentMetric(BaseMetric):
         super().__init__(name="sentiment")
 
         if SentimentIntensityAnalyzer is None:
-            raise ImportError("NLTK required for sentiment. Install with: pip install nltk")
+            raise ImportError(
+                "NLTK required for sentiment. Install with: pip install nltk"
+            )
 
         try:
             self.analyzer = SentimentIntensityAnalyzer()
@@ -44,6 +46,6 @@ class SentimentMetric(BaseMetric):
                 "positive": scores["pos"],
                 "negative": scores["neg"],
                 "neutral": scores["neu"],
-                "compound": compound_score
-            }
+                "compound": compound_score,
+            },
         )

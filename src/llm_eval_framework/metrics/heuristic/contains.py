@@ -1,4 +1,4 @@
-from src.metrics.base import BaseMetric, MetricResult
+from llm_eval_framework.metrics.base import BaseMetric, MetricResult
 
 
 class ContainsMetric(BaseMetric):
@@ -28,7 +28,9 @@ class ContainsMetric(BaseMetric):
         substring_to_check = substring if substring is not None else self.substring
 
         if substring_to_check is None:
-            raise ValueError("Substring must be provided either in constructor or score()")
+            raise ValueError(
+                "Substring must be provided either in constructor or score()"
+            )
 
         if not self.case_sensitive:
             found = substring_to_check.lower() in output.lower()
@@ -37,5 +39,5 @@ class ContainsMetric(BaseMetric):
 
         return MetricResult(
             value=1.0 if found else 0.0,
-            details=f"Substring '{substring_to_check}' {'found' if found else 'not found'} in output"
+            details=f"Substring '{substring_to_check}' {'found' if found else 'not found'} in output",
         )
