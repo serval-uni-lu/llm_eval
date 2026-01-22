@@ -106,10 +106,7 @@ class LLM:
         else:
             dtype = torch.float32
 
-        model_kwargs = {
-            "dtype": dtype,
-            # **quantization_kwargs
-        }
+        model_kwargs = {"dtype": dtype, **quantization_kwargs}
 
         # Only use device_map for quantized models (required by bitsandbytes)
         # Regular models use .to(device) for cleaner memory management
