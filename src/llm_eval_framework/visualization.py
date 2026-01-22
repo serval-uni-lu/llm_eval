@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-from llm_eval_framework.utils import normalize_text
+from .utils import normalize_text
 
 # Style constants
 DARK = "#2c3e50"

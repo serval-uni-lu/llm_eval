@@ -2,7 +2,7 @@ import math
 import warnings
 from typing import Any, Tuple, List, Union
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 try:
     from munkres import Munkres, make_cost_matrix

@@ -1,7 +1,7 @@
 from typing import Union, List
 from rouge_score import rouge_scorer
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class ROUGEMetric(BaseMetric):

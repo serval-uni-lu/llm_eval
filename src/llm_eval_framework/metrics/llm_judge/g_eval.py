@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
-from llm_eval_framework.prompt import Prompt
-from llm_eval_framework.llm import LLM, LLMOutput
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
+from ...prompt import Prompt
+from ...llm import LLM, LLMOutput
 
 
 class GEvalOutput(BaseModel):

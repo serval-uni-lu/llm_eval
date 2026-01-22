@@ -1,6 +1,6 @@
 import json
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class IsJsonMetric(BaseMetric):

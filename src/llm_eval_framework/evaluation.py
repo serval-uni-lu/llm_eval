@@ -2,12 +2,12 @@ import json
 import yaml
 from pathlib import Path
 
-from llm_eval_framework.llm import LLM
-from llm_eval_framework.dataset import Dataset
-from llm_eval_framework.decorators import retry
-from llm_eval_framework.metrics import Metric, list_metrics
-from llm_eval_framework.utils import normalize_text, ensure_dir, clear_cuda_cache
-from llm_eval_framework.basemodels import ModelConfig, DatasetConfig, EvaluationConfig
+from .llm import LLM
+from .dataset import Dataset
+from .decorators import retry
+from .metrics import Metric, list_metrics
+from .utils import normalize_text, ensure_dir, clear_cuda_cache
+from .basemodels import ModelConfig, DatasetConfig, EvaluationConfig
 
 
 def run_evaluation(config: EvaluationConfig):
@@ -340,4 +340,3 @@ def _compute_judge_metric(
         )
     else:
         print(f"    Saved {len(results)} results (all failed)")
-

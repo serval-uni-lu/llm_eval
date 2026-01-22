@@ -1,9 +1,8 @@
 import json
 import yaml
-import importlib
 from pathlib import Path
 
-from llm_eval_framework.metrics.base import BaseMetric
+from .base import BaseMetric
 
 
 def load_registry() -> dict:
@@ -55,12 +54,10 @@ def _load_heuristic_metric(name: str, config: dict, kwargs: dict) -> BaseMetric:
     Returns:
         BaseMetric instance
     """
-    class_path = config["class"]
-    module_path, class_name = class_path.rsplit(".", 1)
+    from . import heuristic
 
     # Import the class
-    module = importlib.import_module(module_path)
-    metric_class = getattr(module, class_name)
+    metric_class = getattr(heuristic, config["class"])
 
     # Instantiate with provided kwargs
     return metric_class(**kwargs)

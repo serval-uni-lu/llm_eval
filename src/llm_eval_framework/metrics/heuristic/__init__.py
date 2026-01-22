@@ -1,14 +1,14 @@
 """Heuristic metrics."""
 
-from llm_eval_framework.metrics.heuristic.anls import ANLSMetric
-from llm_eval_framework.metrics.heuristic.bleu import BLEUMetric
-from llm_eval_framework.metrics.heuristic.contains import ContainsMetric
-from llm_eval_framework.metrics.heuristic.equals import EqualsMetric
-from llm_eval_framework.metrics.heuristic.is_json import IsJsonMetric
-from llm_eval_framework.metrics.heuristic.levenshtein import LevenshteinMetric
-from llm_eval_framework.metrics.heuristic.regex_match import RegexMatchMetric
-from llm_eval_framework.metrics.heuristic.rouge import ROUGEMetric
-from llm_eval_framework.metrics.heuristic.sentiment import SentimentMetric
+from .anls import ANLSMetric
+from .bleu import BLEUMetric
+from .contains import ContainsMetric
+from .equals import EqualsMetric
+from .is_json import IsJsonMetric
+from .levenshtein import LevenshteinMetric
+from .regex_match import RegexMatchMetric
+from .rouge import ROUGEMetric
+from .sentiment import SentimentMetric
 
 __all__ = [
     "ANLSMetric",

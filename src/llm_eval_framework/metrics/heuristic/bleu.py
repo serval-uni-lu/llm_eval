@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 try:
     from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction

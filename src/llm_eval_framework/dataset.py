@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from pydantic import BaseModel
 
-from llm_eval_framework.prompt import Prompt
+from .prompt import Prompt
 
 
 class DatasetMetadata(BaseModel):
@@ -81,4 +81,3 @@ class Dataset:
 
     def __getitem__(self, index):
         return self.data[index]
-

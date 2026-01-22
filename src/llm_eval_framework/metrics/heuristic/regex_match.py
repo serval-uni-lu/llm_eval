@@ -1,7 +1,7 @@
 import re
 from typing import Union
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class RegexMatchMetric(BaseMetric):

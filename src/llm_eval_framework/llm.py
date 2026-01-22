@@ -10,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 @dataclass
 class LLMOutput:
     """Output from LLM generation."""
+
     content: str
     logprobs: Optional[Dict[str, Any]] = None
 
@@ -20,7 +21,7 @@ class LLMOutput:
             Dictionary if valid JSON found, None otherwise
         """
         # Try to find JSON in the content
-        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
         matches = re.findall(json_pattern, self.content, re.DOTALL)
 
         for match in matches:
@@ -30,7 +31,7 @@ class LLMOutput:
                 continue
 
         # If no JSON found, try to extract from markdown code blocks
-        code_block_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+        code_block_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
         matches = re.findall(code_block_pattern, self.content, re.DOTALL)
 
         for match in matches:
@@ -67,12 +68,15 @@ class LLM:
         self.enable_compile = enable_compile
 
         # Configure torch._dynamo to prevent recompilation limit errors
-        if hasattr(torch, '_dynamo') and hasattr(torch._dynamo, 'config'):
+        if hasattr(torch, "_dynamo") and hasattr(torch._dynamo, "config"):
             # Increase cache size limit from default (8) to handle varying input sizes
             torch._dynamo.config.cache_size_limit = 256
 
             # Disable compilation if requested (via parameter or environment variable)
-            if not self.enable_compile or os.environ.get('DISABLE_TORCH_COMPILE', '0') == '1':
+            if (
+                not self.enable_compile
+                or os.environ.get("DISABLE_TORCH_COMPILE", "0") == "1"
+            ):
                 torch._dynamo.config.suppress_errors = True
 
         print(f"Loading model: {model_name} on {self.device}...")
@@ -81,6 +85,7 @@ class LLM:
         quantization_kwargs = {}
         if load_in_4bit or load_in_8bit:
             from transformers import BitsAndBytesConfig
+
             quantization_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=load_in_4bit,
                 load_in_8bit=load_in_8bit,
@@ -91,11 +96,11 @@ class LLM:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         # Configure tokenizer padding
-        self.tokenizer.padding_side = 'right'
+        self.tokenizer.padding_side = "right"
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        is_gemma3 = 'gemma-3' in model_name.lower()
+        is_gemma3 = "gemma-3" in model_name.lower()
         if self.device == "cuda" and not is_gemma3:
             dtype = torch.float16
         else:
@@ -103,7 +108,7 @@ class LLM:
 
         model_kwargs = {
             "dtype": dtype,
-            **quantization_kwargs
+            # **quantization_kwargs
         }
 
         # Only use device_map for quantized models (required by bitsandbytes)
@@ -114,7 +119,7 @@ class LLM:
         if not quantization_kwargs:
             self.model = self.model.to(self.device)
 
-        print(f"Model loaded successfully!")
+        print("Model loaded successfully!")
 
     def generate(
         self,
@@ -140,10 +145,13 @@ class LLM:
         requested_tokens = max_new_tokens if max_new_tokens is not None else 512
 
         # Get model's max context length
-        max_context = getattr(self.model.config, 'max_position_embeddings', None)
+        max_context = getattr(self.model.config, "max_position_embeddings", None)
         if max_context is None:
-            max_context = getattr(self.model.config, 'n_positions',
-                                  getattr(self.model.config, 'max_sequence_length', 8192))
+            max_context = getattr(
+                self.model.config,
+                "n_positions",
+                getattr(self.model.config, "max_sequence_length", 8192),
+            )
 
         # Tokenize input
         inputs = self.tokenizer(
@@ -163,7 +171,9 @@ class LLM:
 
         actual_max_tokens = min(requested_tokens, available_tokens)
         if actual_max_tokens < requested_tokens:
-            print(f"Capping max_new_tokens from {requested_tokens} to {actual_max_tokens} to fit context")
+            print(
+                f"Capping max_new_tokens from {requested_tokens} to {actual_max_tokens} to fit context"
+            )
 
         # Build generation kwargs
         gen_kwargs = {
@@ -186,20 +196,22 @@ class LLM:
 
         # Decode generated text
         generated_tokens = outputs.sequences[:, input_length:]
-        generated_text = self.tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+        generated_text = self.tokenizer.decode(
+            generated_tokens[0], skip_special_tokens=True
+        )
 
         # Compute logprobs if requested
         logprobs_dict = None
         if return_logprobs and outputs.scores:
             logprobs_dict = self._compute_logprobs(
-                generated_tokens[0],
-                outputs.scores,
-                topk_logprobs
+                generated_tokens[0], outputs.scores, topk_logprobs
             )
 
         return LLMOutput(content=generated_text, logprobs=logprobs_dict)
 
-    def _compute_logprobs(self, generated_tokens: torch.Tensor, scores: tuple, topk: int) -> Dict[str, Any]:
+    def _compute_logprobs(
+        self, generated_tokens: torch.Tensor, scores: tuple, topk: int
+    ) -> Dict[str, Any]:
         """Compute logprobs from generation scores.
 
         Args:
@@ -214,13 +226,15 @@ class LLM:
         transition_scores = self.model.compute_transition_scores(
             sequences=generated_tokens.unsqueeze(0),
             scores=scores,
-            normalize_logits=True
+            normalize_logits=True,
         )
 
         # Build content logprobs structure
         content_logprobs = []
 
-        for i, (token_id, score) in enumerate(zip(generated_tokens, transition_scores[0])):
+        for i, (token_id, score) in enumerate(
+            zip(generated_tokens, transition_scores[0])
+        ):
             token = self.tokenizer.decode(token_id)
             logprob = score.cpu().item()
 
@@ -229,30 +243,30 @@ class LLM:
             if i < len(scores) and topk > 0:
                 # Get top k+1 tokens (including the selected one)
                 log_probs = torch.log_softmax(scores[i][0], dim=-1)
-                top_k_values, top_k_indices = torch.topk(log_probs, k=min(topk + 1, log_probs.shape[-1]))
+                top_k_values, top_k_indices = torch.topk(
+                    log_probs, k=min(topk + 1, log_probs.shape[-1])
+                )
 
                 for val, idx in zip(top_k_values, top_k_indices):
                     if idx != token_id:
-                        top_logprobs.append({
-                            'token': self.tokenizer.decode(idx),
-                            'logprob': val.cpu().item()
-                        })
+                        top_logprobs.append(
+                            {
+                                "token": self.tokenizer.decode(idx),
+                                "logprob": val.cpu().item(),
+                            }
+                        )
                         if len(top_logprobs) >= topk:
                             break
 
-            content_logprobs.append({
-                'token': token,
-                'logprob': logprob,
-                'top_logprobs': top_logprobs
-            })
+            content_logprobs.append(
+                {"token": token, "logprob": logprob, "top_logprobs": top_logprobs}
+            )
 
-        return {'content': content_logprobs}
+        return {"content": content_logprobs}
 
     @staticmethod
     def list_cached_models(
-        sort_by: str = "size",
-        reverse: bool = True,
-        model_filter: Optional[str] = None
+        sort_by: str = "size", reverse: bool = True, model_filter: Optional[str] = None
     ) -> List[Dict[str, any]]:
         """List HuggingFace models cached locally.
 
@@ -265,13 +279,12 @@ class LLM:
             List of dicts with model info
         """
         from src.model_cache import list_cached_models
+
         return list_cached_models(sort_by, reverse, model_filter)
 
     @staticmethod
     def print_cached_models(
-        sort_by: str = "size",
-        reverse: bool = True,
-        model_filter: Optional[str] = None
+        sort_by: str = "size", reverse: bool = True, model_filter: Optional[str] = None
     ) -> None:
         """Print cached HuggingFace models in a formatted table.
 
@@ -281,6 +294,7 @@ class LLM:
             model_filter: Optional substring to filter model names
         """
         from src.model_cache import print_cached_models
+
         print_cached_models(sort_by, reverse, model_filter)
 
     @staticmethod
@@ -291,6 +305,7 @@ class LLM:
             Total cache size in gigabytes
         """
         from src.model_cache import get_cache_size
+
         return get_cache_size()
 
     def unload(self) -> None:
@@ -300,11 +315,11 @@ class LLM:
         import platform
 
         # Step 1: Delete model and tokenizer
-        if hasattr(self, 'model'):
+        if hasattr(self, "model"):
             del self.model
             self.model = None
 
-        if hasattr(self, 'tokenizer'):
+        if hasattr(self, "tokenizer"):
             del self.tokenizer
             self.tokenizer = None
 
@@ -325,4 +340,4 @@ class LLM:
         except Exception:
             pass
 
-        print(f"Model unloaded and memory freed")
+        print("Model unloaded and memory freed")

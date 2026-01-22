@@ -2,8 +2,8 @@ import inspect
 from typing import Optional
 from dataclasses import dataclass
 
-from llm_eval_framework.llm import LLM
-from llm_eval_framework.metrics.base import MetricResult
+from ..llm import LLM
+from .base import MetricResult
 
 
 @dataclass
@@ -38,7 +38,7 @@ class Metric:
             name: Metric name from registry
             **config: Metric-specific configuration
         """
-        from src.metrics.loader import get_metric, load_registry
+        from .loader import get_metric, load_registry
 
         self._name = name
         self._metric = get_metric(name, **config)

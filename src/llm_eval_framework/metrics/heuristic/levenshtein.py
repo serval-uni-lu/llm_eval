@@ -1,6 +1,6 @@
 from rapidfuzz.distance import Indel
 
-from llm_eval_framework.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class LevenshteinMetric(BaseMetric):
