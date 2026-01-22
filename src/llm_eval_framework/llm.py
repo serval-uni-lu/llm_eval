@@ -120,24 +120,30 @@ class LLM:
 
     def generate(
         self,
-        prompt: str,
+        prompts: str | List[str],
         max_new_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         topk_logprobs: Optional[int] = None,
-    ) -> LLMOutput:
-        """Generate response with optional sampling parameters.
+    ) -> List[LLMOutput]:
+        """Generate responses for a batch of prompts.
 
         Args:
-            prompt: Input prompt
+            prompts: either a single input (str) prompt or a List of input prompts
             max_new_tokens: Maximum tokens to generate (may be capped to fit context)
             temperature: Sampling temperature
             top_p: Nucleus sampling parameter
             topk_logprobs: Number of top log probabilities to return
 
         Returns:
-            LLMOutput with content and optional logprobs
+            List of LLMOutput objects (one per prompt)
         """
+        if not prompts:
+            return []
+
+        if isinstance(prompts, str):
+            prompts = [prompts]
+
         return_logprobs = topk_logprobs is not None
         requested_tokens = max_new_tokens if max_new_tokens is not None else 512
 
@@ -150,26 +156,29 @@ class LLM:
                 getattr(self.model.config, "max_sequence_length", 8192),
             )
 
-        # Tokenize input
+        # Tokenize batch
         inputs = self.tokenizer(
-            [prompt],
+            prompts,
             return_tensors="pt",
+            padding=True,
         ).to(self.device)
 
-        input_length = inputs.input_ids.shape[1]
+        input_lengths = inputs.input_ids.ne(self.tokenizer.pad_token_id).sum(dim=1)
+        max_input_length = int(input_lengths.max())
 
-        # Cap max_new_tokens to fit within context window
-        available_tokens = max_context - input_length
+        # Cap max_new_tokens to fit context window (batch-wide)
+        available_tokens = max_context - max_input_length
         if available_tokens <= 0:
             raise ValueError(
-                f"Input length ({input_length}) exceeds model context ({max_context}). "
-                f"Cannot generate any tokens."
+                f"Longest input length ({max_input_length}) exceeds model context "
+                f"({max_context}). Cannot generate any tokens."
             )
 
         actual_max_tokens = min(requested_tokens, available_tokens)
         if actual_max_tokens < requested_tokens:
             print(
-                f"Capping max_new_tokens from {requested_tokens} to {actual_max_tokens} to fit context"
+                f"Capping max_new_tokens from {requested_tokens} to "
+                f"{actual_max_tokens} to fit context"
             )
 
         # Build generation kwargs
@@ -191,20 +200,32 @@ class LLM:
         with torch.no_grad():
             outputs = self.model.generate(**inputs, **gen_kwargs)
 
-        # Decode generated text
-        generated_tokens = outputs.sequences[:, input_length:]
-        generated_text = self.tokenizer.decode(
-            generated_tokens[0], skip_special_tokens=True
-        )
+        sequences = outputs.sequences
+        results: List[LLMOutput] = []
 
-        # Compute logprobs if requested
-        logprobs_dict = None
-        if return_logprobs and outputs.scores:
-            logprobs_dict = self._compute_logprobs(
-                generated_tokens[0], outputs.scores, topk_logprobs
+        # Process each example independently
+        for i, input_len in enumerate(input_lengths.tolist()):
+            generated_tokens = sequences[i, input_len:]
+            generated_text = self.tokenizer.decode(
+                generated_tokens, skip_special_tokens=True
             )
 
-        return LLMOutput(content=generated_text, logprobs=logprobs_dict)
+            logprobs_dict = None
+            if return_logprobs and outputs.scores:
+                logprobs_dict = self._compute_logprobs(
+                    generated_tokens,
+                    [score[i] for score in outputs.scores],
+                    topk_logprobs,
+                )
+
+            results.append(
+                LLMOutput(
+                    content=generated_text,
+                    logprobs=logprobs_dict,
+                )
+            )
+
+        return results
 
     def _compute_logprobs(
         self, generated_tokens: torch.Tensor, scores: tuple, topk: int
