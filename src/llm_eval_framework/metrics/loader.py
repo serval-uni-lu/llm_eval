@@ -74,7 +74,7 @@ def _load_llm_judge_metric(name: str, config: dict, kwargs: dict) -> BaseMetric:
     Returns:
         BaseMetric instance (GEval)
     """
-    from src.metrics.llm_judge.g_eval import GEval
+    from .llm_judge.g_eval import GEval
 
     # Load template configuration
     template_name = config["template"]

@@ -296,7 +296,7 @@ class LLM:
         Returns:
             List of dicts with model info
         """
-        from src.model_cache import list_cached_models
+        from .model_cache import list_cached_models
 
         return list_cached_models(sort_by, reverse, model_filter)
 
@@ -311,7 +311,7 @@ class LLM:
             reverse: Sort in descending order (default True)
             model_filter: Optional substring to filter model names
         """
-        from src.model_cache import print_cached_models
+        from .model_cache import print_cached_models
 
         print_cached_models(sort_by, reverse, model_filter)
 
@@ -322,7 +322,7 @@ class LLM:
         Returns:
             Total cache size in gigabytes
         """
-        from src.model_cache import get_cache_size
+        from .model_cache import get_cache_size
 
         return get_cache_size()
 
