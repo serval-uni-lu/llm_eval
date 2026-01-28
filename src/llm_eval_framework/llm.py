@@ -213,9 +213,12 @@ class LLM:
             logprobs_dict = None
             if return_logprobs and outputs.scores:
                 logprobs_dict = self._compute_logprobs(
-                    generated_tokens,
-                    [score[i] for score in outputs.scores],
-                    topk_logprobs,
+                    sequences=sequences,  # full sequences from generate
+                    input_len=input_len,  # prompt length for this example
+                    example_idx=i,  # which row in the batch
+                    scores=outputs.scores,  # full batched scores tuple
+                    topk=(topk_logprobs or 0),  # handle None
+                    beam_indices=getattr(outputs, "beam_indices", None),
                 )
 
             results.append(
@@ -228,56 +231,102 @@ class LLM:
         return results
 
     def _compute_logprobs(
-        self, generated_tokens: torch.Tensor, scores: tuple, topk: int
+        self,
+        sequences: torch.Tensor,
+        input_len: int,
+        example_idx: int,
+        scores: tuple,
+        topk: int,
+        beam_indices: Optional[torch.Tensor] = None,
     ) -> Dict[str, Any]:
-        """Compute logprobs from generation scores.
+        """
+        Compute token-level logprobs and top-k alternatives for a single example
+        from a batched generation.
 
         Args:
-            generated_tokens: Generated token IDs
-            scores: Tuple of score tensors from generation
-            topk: Number of top alternative tokens to include
+            sequences: Full output sequences from generate (shape [batch, total_len])
+            input_len: Prompt length for the example (int)
+            example_idx: Index of the example in the batch (int)
+            scores: Tuple of length num_generated_tokens; each tensor is [batch, vocab_size]
+            topk: Number of top alternative tokens to include (int)
+            beam_indices: Beam indices from generate (if beam search was used), else None
 
         Returns:
-            Dictionary with logprobs information
+            Dict with "content": list of per-token dicts:
+                {
+                  "token": str,
+                  "logprob": float,
+                  "top_logprobs": List[{"token": str, "logprob": float}]
+                }
         """
-        # Compute transition scores (log probabilities)
+        # Defensive guards
+        assert isinstance(scores, (list, tuple)) and len(scores) > 0, (
+            "scores must be a non-empty tuple/list"
+        )
+        batch_size = sequences.size(0)
+        assert 0 <= example_idx < batch_size, "example_idx out of range"
+
+        # Number of generated tokens equals len(scores) for standard generation
+        num_steps = len(scores)
+
+        # HF expects *full* sequences and *batched* scores
         transition_scores = self.model.compute_transition_scores(
-            sequences=generated_tokens.unsqueeze(0),
+            sequences=sequences,
             scores=scores,
-            normalize_logits=True,
+            beam_indices=beam_indices,
+            normalize_logits=True,  # returns log-probs per generated token
+        )  # shape: [batch, num_steps]
+
+        # Extract the row for this example
+        ts_row = (
+            transition_scores[example_idx].detach().cpu().tolist()
+        )  # length == num_steps
+
+        # Extract generated token ids for this example: tokens after the prompt
+        gen_ids = (
+            sequences[example_idx, input_len : input_len + num_steps]
+            .detach()
+            .cpu()
+            .tolist()
         )
 
-        # Build content logprobs structure
-        content_logprobs = []
+        content_logprobs: List[Dict[str, Any]] = []
+        vocab_size = scores[0].size(-1)
 
-        for i, (token_id, score) in enumerate(
-            zip(generated_tokens, transition_scores[0])
-        ):
-            token = self.tokenizer.decode(token_id)
-            logprob = score.cpu().item()
+        for step_idx in range(num_steps):
+            token_id = int(gen_ids[step_idx])
+            logprob = float(ts_row[step_idx])
 
-            # Get top logprobs for this position
-            top_logprobs = []
-            if i < len(scores) and topk > 0:
-                # Get top k+1 tokens (including the selected one)
-                log_probs = torch.log_softmax(scores[i][0], dim=-1)
-                top_k_values, top_k_indices = torch.topk(
-                    log_probs, k=min(topk + 1, log_probs.shape[-1])
-                )
+            # Decode token safely
+            token_str = self.tokenizer.decode([token_id])
 
-                for val, idx in zip(top_k_values, top_k_indices):
-                    if idx != token_id:
-                        top_logprobs.append(
-                            {
-                                "token": self.tokenizer.decode(idx),
-                                "logprob": val.cpu().item(),
-                            }
-                        )
-                        if len(top_logprobs) >= topk:
-                            break
+            top_logprobs: List[Dict[str, Any]] = []
+            if topk and topk > 0:
+                # Per-step logits for this example: [vocab_size] on model device
+                step_logits = scores[step_idx][example_idx]  # [vocab_size]
+                # Convert to log-probabilities
+                log_probs = torch.log_softmax(step_logits, dim=-1)
+
+                # Get more than topk to allow excluding the actually generated token
+                k = min(topk + 1, vocab_size)
+                top_vals, top_indices = torch.topk(log_probs, k=k, dim=-1)
+
+                # Build alternatives excluding the actually generated token
+                for val, idx in zip(top_vals.tolist(), top_indices.tolist()):
+                    idx_int = int(idx)
+                    if idx_int == token_id:
+                        continue
+                    top_logprobs.append(
+                        {
+                            "token": self.tokenizer.decode([idx_int]),
+                            "logprob": float(val),
+                        }
+                    )
+                    if len(top_logprobs) >= topk:
+                        break
 
             content_logprobs.append(
-                {"token": token, "logprob": logprob, "top_logprobs": top_logprobs}
+                {"token": token_str, "logprob": logprob, "top_logprobs": top_logprobs}
             )
 
         return {"content": content_logprobs}
