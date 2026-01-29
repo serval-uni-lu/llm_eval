@@ -54,7 +54,7 @@ class GEval(BaseMetric):
     def score(
         self,
         llm: LLM,
-        input: str,
+        input_prompt: str,
         output: str,
         reference: Optional[str] = None,
         sampling_params: dict = None,
@@ -63,7 +63,7 @@ class GEval(BaseMetric):
 
         Args:
             llm: LLM instance to use as judge
-            input: The input prompt
+            input_prompt: The input prompt
             output: The model output to evaluate
             reference: Optional reference answer
             sampling_params: Sampling parameters for generation (max_new_tokens, temperature, etc.)
@@ -71,16 +71,56 @@ class GEval(BaseMetric):
         Returns:
             MetricResult with normalized score and reasoning details
         """
+        eval_prompt = self.prepare_eval_prompt(
+            input_prompt, output, reference, sampling_params
+        )
+
+        # Generate evaluation with logprobs and sampling params
+        raw_output = llm.generate(eval_prompt, topk_logprobs=10, **sampling_params)
+
+        # Parse and return result
+        try:
+            return self.parse_model_output(raw_output)
+        except ValueError as e:
+            # Enrich error with context for debugging
+            error_msg = (
+                f"{str(e)}\n\nEval Prompt:\n{eval_prompt[:500]}..."
+                f"\n\nJudge Output:\n{repr(raw_output.content)}"
+            )
+
+            # Store context in exception for access in evaluation pipeline
+            enriched_error = ValueError(error_msg)
+            enriched_error.eval_prompt = eval_prompt
+            enriched_error.judge_output = raw_output.content
+            raise enriched_error
+
+    def prepare_eval_prompt(
+        self,
+        input_prompt: str,
+        output: str,
+        reference: Optional[str] = None,
+        sampling_params: dict = None,
+    ) -> str:
+        """Prepare the evalution prompt for the G-Eval metric score.
+
+        Args:
+            input_prompt: The input prompt
+            output: The model output to evaluate
+            reference: Optional reference answer
+            sampling_params: Sampling parameters for generation (max_new_tokens, temperature, etc.)
+
+        Returns:
+            The evaluation prompt
+        """
         if sampling_params is None:
             sampling_params = {"max_new_tokens": 512}
-            # sampling_params = {}
 
         # Prepare template fields
         fields = {
             "task_introduction": self.task_introduction,
             "evaluation_criteria": self.evaluation_criteria,
             "chain_of_thought": self.chain_of_thought,
-            "input": input,
+            "input": input_prompt,
             "output": output,
         }
 
@@ -91,26 +131,7 @@ class GEval(BaseMetric):
         else:
             prompt_template = Prompt(self.prompt_templates["no_reference"])
 
-        eval_prompt = prompt_template.format(**fields)
-
-        # Generate evaluation with logprobs and sampling params
-        raw_output = llm.generate(eval_prompt, topk_logprobs=10, **sampling_params)
-        # print(f"Judge Output: {raw_output.content.replace('\n', ' ')}")
-
-        # Parse and return result
-        try:
-            return self.parse_model_output(raw_output)
-        except ValueError as e:
-            # Enrich error with context for debugging
-            error_msg = str(e)
-            error_msg += f"\n\nEval Prompt:\n{eval_prompt[:500]}..."
-            error_msg += f"\n\nJudge Output:\n{repr(raw_output.content)}"
-
-            # Store context in exception for access in evaluation pipeline
-            enriched_error = ValueError(error_msg)
-            enriched_error.eval_prompt = eval_prompt
-            enriched_error.judge_output = raw_output.content
-            raise enriched_error
+        return prompt_template.format(**fields)
 
     def parse_model_output(self, output: LLMOutput) -> MetricResult:
         """Parse model output and return weighted score with reasoning details.
