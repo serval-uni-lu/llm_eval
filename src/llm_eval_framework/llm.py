@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from .utils import clear_cuda_cache
+
 
 @dataclass
 class LLMOutput:
@@ -359,3 +361,56 @@ class LLM:
             pass
 
         print("Model unloaded and memory freed")
+
+
+class LLMGenerationWrapper:
+    def __init__(
+        self,
+        model_name,
+        load_in_4bit,
+        load_in_8bit,
+        sampling_params,
+        endpoint,
+        enable_compile=True,
+    ):
+        self.model_section = dict(
+            model_name=model_name, load_in_4bit=load_in_4bit, load_in_8bit=load_in_8bit
+        )
+
+        self.sampling_params = sampling_params
+        self.endpoint = endpoint
+        self.is_remote = (
+            endpoint is not None and isinstance(endpoint, str) and endpoint.strip()
+        )
+        if self.is_remote:
+            self.llm = None
+        else:
+            self.llm = LLM(**self.model_section)
+
+    def _generate_from_remote(self, endpoint: str, model: dict, prompts: dict):
+        import requests
+
+        payload = {
+            "model": model,
+            "prompt": prompts,
+        }
+
+        resp = requests.post(endpoint, json=payload)
+        return resp.json()
+
+    def generate(self, prompts: str | list[str]):
+        prompts_d = {"prompts": prompts, **self.sampling_params}
+
+        if self.is_remote:
+            llm_outputs = self._generate_from_remote(
+                self.endpoint, self.model_section, prompts_d
+            )
+            return [LLMOutput(**outputs) for outputs in llm_outputs]
+        else:
+            outputs = self.llm.generate(**prompts_d)
+            clear_cuda_cache()
+            return outputs
+
+    def unload(self):
+        if self.llm is not None:
+            self.llm.unload()

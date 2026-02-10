@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from .prompt import Prompt
+from .utils import get_items
 
 
 class DatasetMetadata(BaseModel):
@@ -81,3 +82,14 @@ class Dataset:
 
     def __getitem__(self, index):
         return self.data[index]
+
+    def iter(self, batch_size: int):
+        items = (
+            range(len(self)),
+            self.data.to_dict(orient="records"),
+            self.prompts,
+            self.answers or [None] * len(self),
+        )
+        for start in range(0, len(self), batch_size):
+            end = min(start + batch_size, len(self))
+            yield get_items(items, *range(start, end), batch=True)

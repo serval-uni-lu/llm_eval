@@ -1,13 +1,21 @@
 import json
 import yaml
+from itertools import product
 from pathlib import Path
 
-from .llm import LLM
+from .llm import LLMGenerationWrapper
 from .dataset import Dataset
-from .decorators import retry
+from .decorators import retry_batches
 from .metrics import Metric, list_metrics
-from .utils import normalize_text, ensure_dir, clear_cuda_cache
+from .metrics.loader import _load_llm_judge_metric
+from .utils import get_items, normalize_text, ensure_dir, clear_cuda_cache
 from .basemodels import ModelConfig, DatasetConfig, EvaluationConfig
+
+try:
+    # NOTE: Added in python 3.12
+    from itertools import batched
+except ImportError:
+    from .utils import batched
 
 
 def run_evaluation(config: EvaluationConfig):
@@ -45,21 +53,23 @@ def generate_outputs(config: EvaluationConfig):
             print("  ✓ All outputs already exist for this model, skipping entirely")
             continue
 
-        # Load LLM
-        llm = LLM(
-            model_name=model_config.name,
-            load_in_4bit=model_config.load_in_4bit,
-            load_in_8bit=model_config.load_in_8bit,
-        )
-
         # Extract generation parameters
         sampling_params = {}
         if model_config.sampling_params:
             sampling_params = model_config.sampling_params.model_dump(exclude_none=True)
 
+        llm_generation_wrapper = LLMGenerationWrapper(
+            model_name=model_config.name,
+            load_in_4bit=model_config.load_in_4bit,
+            load_in_8bit=model_config.load_in_8bit,
+            sampling_params=sampling_params,
+            endpoint="",
+        )
+
         for dataset_config in config.datasets:
             print(
-                f"  on dataset: {dataset_config.name} with metrics: {', '.join(dataset_config.metrics)}"
+                f"  on dataset: {dataset_config.name} with metrics: "
+                f"{', '.join(dataset_config.metrics)}"
             )
 
             # Load dataset
@@ -78,19 +88,23 @@ def generate_outputs(config: EvaluationConfig):
 
             # Generate outputs
             outputs = []
-            for i, prompt in enumerate(dataset.prompts):
-                llm_output = llm.generate(prompt, **sampling_params)
+            for batch in dataset.iter(model_config.batch_size):
+                # NOTE: batch := indices, rows, prompts, answers
+                llm_outputs = llm_generation_wrapper.generate(
+                    batch[2], **sampling_params
+                )
 
-                # Get row data from dataset
-                row = dataset.data.iloc[i].to_dict()
-
-                output = {
-                    "prompt": prompt,
-                    "response": llm_output.content,
-                    **row,  # Include all dataset fields (query, context, etc.)
-                }
-                outputs.append(output)
-                print(f"    [{i + 1}/{len(dataset)}] Generated response")
+                for i, row, prompt, answer, llm_output in zip(*batch, llm_outputs):
+                    output = row.copy()
+                    output.update(
+                        dict(
+                            prompt=prompt,
+                            answer=answer,
+                            response=llm_output.content,
+                        )
+                    )
+                    print(f"    [{i + 1}/{len(dataset)}] Generated response")
+                    outputs.append(output)
 
             # Save outputs
             with open(output_path, "w") as f:
@@ -100,7 +114,7 @@ def generate_outputs(config: EvaluationConfig):
             print(f"  Saved {len(outputs)} outputs to {output_path}")
 
         # Unload LLM and clear cache
-        llm.unload()
+        llm_generation_wrapper.unload()
         clear_cuda_cache()
 
 
@@ -116,24 +130,24 @@ def compute_metrics(config: EvaluationConfig):
     llm_judge_metrics = set(metric_types["llm_judge"].keys())
 
     # Phase 1: Heuristic metrics
-    for model_config in config.models:
-        for dataset_config in config.datasets:
-            heuristic_to_compute = [
-                m for m in dataset_config.metrics if m in heuristic_metrics
-            ]
-            if not heuristic_to_compute:
-                continue
+    for model_config, dataset_config in product(config.models, config.datasets):
+        heuristic_to_compute = [
+            m for m in dataset_config.metrics if m in heuristic_metrics
+        ]
+        if not heuristic_to_compute:
+            continue
 
-            print(
-                f"\nComputing heuristic metrics for model={model_config.name}, dataset={dataset_config.name}"
-            )
+        print(
+            f"\nComputing heuristic metrics for model={model_config.name}, "
+            f"dataset={dataset_config.name}"
+        )
 
-            outputs, output_dir = _load_outputs(config, model_config, dataset_config)
-            if not outputs:
-                continue
+        outputs, output_dir = _load_outputs(config, model_config, dataset_config)
+        if not outputs:
+            continue
 
-            for metric_name in heuristic_to_compute:
-                _compute_heuristic_metric(metric_name, outputs, output_dir)
+        for metric_name in heuristic_to_compute:
+            _compute_heuristic_metric(metric_name, outputs, output_dir)
 
     # Phase 2: LLM judge metrics
     judge_needed = any(
@@ -141,58 +155,172 @@ def compute_metrics(config: EvaluationConfig):
         for dataset in config.datasets
     )
 
-    if judge_needed:
-        if not config.judge_model:
-            print("\nWarning: LLM judge metrics requested but no judge_model provided")
-            return
+    if not judge_needed or not config.judge_model:
+        print("\nWarning: LLM judge metrics requested but no judge_model provided")
+        return
 
-        # Clear CUDA cache before loading judge model
-        clear_cuda_cache()
+    # Clear CUDA cache before loading judge model
+    clear_cuda_cache()
 
-        print(f"\nLoading LLM judge: {config.judge_model.name}")
-        llm_judge = LLM(
-            model_name=config.judge_model.name,
-            load_in_4bit=config.judge_model.load_in_4bit,
-            load_in_8bit=config.judge_model.load_in_8bit,
-            enable_compile=False,
+    # Extract sampling params from judge config
+    judge_sampling_params = {}
+    if config.judge_model.sampling_params:
+        judge_sampling_params = config.judge_model.sampling_params.model_dump(
+            exclude_none=True
         )
 
-        # Extract sampling params from judge config
-        judge_sampling_params = {}
-        if config.judge_model.sampling_params:
-            judge_sampling_params = config.judge_model.sampling_params.model_dump(
-                exclude_none=True
+    print(f"\nLoading LLM judge: {config.judge_model.name}")
+    llm_judge_generation_wrapper = LLMGenerationWrapper(
+        model_name=config.judge_model.name,
+        load_in_4bit=config.judge_model.load_in_4bit,
+        load_in_8bit=config.judge_model.load_in_8bit,
+        sampling_params=judge_sampling_params,
+        endpoint="",
+    )
+
+    for model_config, dataset_config in product(config.models, config.datasets):
+        judge_to_compute = [m for m in dataset_config.metrics if m in llm_judge_metrics]
+        if not judge_to_compute:
+            continue
+
+        print(
+            f"\nComputing LLM judge metrics for model={model_config.name}, "
+            f"dataset={dataset_config.name}"
+        )
+
+        outputs, output_dir = _load_outputs(config, model_config, dataset_config)
+        if not outputs:
+            continue
+
+        for metric_name in judge_to_compute:
+            _compute_judge_metric(
+                metric_name,
+                outputs,
+                output_dir,
+                llm_judge_generation_wrapper,
             )
 
-        for model_config in config.models:
-            for dataset_config in config.datasets:
-                judge_to_compute = [
-                    m for m in dataset_config.metrics if m in llm_judge_metrics
-                ]
-                if not judge_to_compute:
-                    continue
+    print("\nUnloading LLM judge...")
+    llm_judge_generation_wrapper.unload()
 
-                print(
-                    f"\nComputing LLM judge metrics for model={model_config.name}, dataset={dataset_config.name}"
+
+def compute_metrics_in_batches(
+    outputs,
+    retries,
+    batch_size,
+    metric_name,
+    llm_judge_generation_wrapper: LLMGenerationWrapper | None = None,
+) -> list[dict]:
+    metric_types = list_metrics()
+    heuristic_metrics = set(metric_types["heuristic"].keys())
+    is_heuristic = metric_name in heuristic_metrics
+
+    if is_heuristic:
+        metric = Metric(metric_name)
+    else:
+        metric = _load_llm_judge_metric(
+            metric_name, {"template": f"{metric_name}.yaml"}, {}
+        )
+
+    @retry_batches(retries=retries)
+    def _process_batches(llm_inputs: list[dict], batch_size: int):
+        """
+        Processes one round of batches.
+        Returns:
+            results: dict{sub_index -> parsed_output}
+            failed: dict{sub_index -> enriched error str}
+        """
+        results = {}
+        failed = {}
+
+        for sub_indices in batched(range(len(llm_inputs)), batch_size):
+            batch = get_items(llm_inputs, *sub_indices, batch=False)
+            if is_heuristic:
+                batch_results = _compute_batched_heuristic_metric(metric, batch)
+            else:
+                batch_results = _compute_batched_judge_metric(
+                    metric,
+                    batch,
+                    llm_judge_generation_wrapper,
                 )
 
-                outputs, output_dir = _load_outputs(
-                    config, model_config, dataset_config
-                )
-                if not outputs:
-                    continue
+            for i, result in zip(sub_indices, batch_results):
+                if result.get("score") is None:
+                    failed[i] = result
+                else:
+                    results[i] = result
 
-                for metric_name in judge_to_compute:
-                    _compute_judge_metric(
-                        metric_name,
-                        outputs,
-                        output_dir,
-                        llm_judge,
-                        judge_sampling_params,
-                    )
+        return results, failed
 
-        print("\nUnloading LLM judge...")
-        llm_judge.unload()
+    all_results = _process_batches(outputs, batch_size)
+    valid_results = []
+
+    for i, result in enumerate(all_results, start=1):
+        if result.get("score") is None:
+            error_msg = result.get("error", "")[:80]
+            if error_msg:
+                print(f"    [{i}/{len(outputs)}] ERROR: {error_msg}")
+        else:
+            valid_results.append(result)
+
+    return valid_results
+
+
+def _compute_batched_heuristic_metric(metric, batch, **kwargs) -> list[dict]:
+    batch_results = []
+    for output in batch:
+        try:
+            result_metric = metric.score(output.get("response"), output.get("answer"))
+            result = {"score": result_metric.value, "details": result_metric.details}
+        except Exception as e:
+            result = {
+                "score": None,
+                "details": None,
+                "error": str(e).split("\n")[0],
+                "error_type": type(e).__name__,
+            }
+        batch_results.append(result)
+
+    return batch_results
+
+
+def _compute_batched_judge_metric(
+    metric, batch, llm_judge_generation_wrapper
+) -> list[dict]:
+    prompts = [
+        metric.prepare_eval_prompt(
+            output.get("prompt"), output.get("response"), output.get("answer")
+        )
+        for output in batch
+    ]
+
+    raw_outputs = llm_judge_generation_wrapper.generate(prompts)
+
+    batch_results = []
+    for raw_output, output in enumerate(raw_outputs, batch):
+        try:
+            result_metric = metric.parse_model_output(raw_output)
+            result = {"score": result_metric.value, "details": result_metric.details}
+        except Exception as e:
+            # Graceful error handling after all retries failed
+            result = {
+                "score": None,
+                "details": None,
+                "error": str(e).split("\n")[0],
+                "error_type": type(e).__name__,
+                "prompt": output.get("prompt"),
+                "response": output.get("response"),
+            }
+
+            # Include enriched error context if available
+            if hasattr(e, "eval_prompt"):
+                result["eval_prompt"] = e.eval_prompt
+            if hasattr(e, "judge_output"):
+                result["judge_model_output"] = e.judge_output
+
+        batch_results.append(result)
+
+    return batch_results
 
 
 def _load_outputs(
@@ -228,18 +356,8 @@ def _compute_heuristic_metric(metric_name: str, outputs: list, output_dir: Path)
         return
 
     print(f"  Computing heuristic metric: {metric_name}")
-    metric = Metric(metric_name)
 
-    results = []
-    for output_data in outputs:
-        result = metric.score(output_data["response"], output_data.get("answer"))
-
-        results.append(
-            {
-                "score": result.value,
-                "details": result.details,
-            }
-        )
+    results = compute_metrics_in_batches(outputs, 1, 1, metric_name)
 
     # Save to file
     metrics_dir = output_dir / "metrics"
@@ -257,8 +375,7 @@ def _compute_judge_metric(
     metric_name: str,
     outputs: list,
     output_dir: Path,
-    llm_judge: LLM,
-    sampling_params: dict = None,
+    llm_judge_generation_wrapper: LLMGenerationWrapper,
 ):
     """Compute an LLM judge metric for all outputs."""
 
@@ -270,58 +387,14 @@ def _compute_judge_metric(
         return
 
     print(f"  Computing LLM judge metric: {metric_name}")
-    metric = Metric(metric_name)
 
-    @retry(max_attempts=3, delay=1.0, backoff=2.0)
-    def score_with_retry(llm, input_text, output_text, reference, sampling_params):
-        return metric.score(
-            llm, input_text, output_text, reference, sampling_params=sampling_params
-        )
-
-    results = []
-    for i, output_data in enumerate(outputs):
-        try:
-            result = score_with_retry(
-                llm_judge,
-                output_data["prompt"],
-                output_data["response"],
-                output_data.get("answer"),
-                sampling_params,
-            )
-
-            results.append(
-                {
-                    "score": result.value,
-                    "details": result.details,
-                }
-            )
-            print(f"    [{i + 1}/{len(outputs)}] Score: {result.value:.3f}")
-
-            clear_cuda_cache()
-
-        except Exception as e:
-            # Graceful error handling after all retries failed
-            error_result = {
-                "score": None,
-                "details": None,
-                "error": str(e).split("\n")[0],
-                "error_type": type(e).__name__,
-                "prompt": output_data["prompt"],
-                "response": output_data["response"],
-            }
-
-            # Include enriched error context if available
-            if hasattr(e, "eval_prompt"):
-                error_result["eval_prompt"] = e.eval_prompt
-            if hasattr(e, "judge_output"):
-                error_result["judge_model_output"] = e.judge_output
-
-            results.append(error_result)
-            print(
-                f"    [{i + 1}/{len(outputs)}] ERROR: {str(e).split(chr(10))[0][:80]}"
-            )
-
-            clear_cuda_cache()
+    results = compute_metrics_in_batches(
+        outputs,
+        retries=3,
+        batch_size=10,
+        metric_name=metric_name,
+        llm_judge_generation_wrapper=llm_judge_generation_wrapper,
+    )
 
     # Save to file
     metrics_dir = output_dir / "metrics"
@@ -336,7 +409,8 @@ def _compute_judge_metric(
     if successful_scores:
         avg_score = sum(successful_scores) / len(successful_scores)
         print(
-            f"    Saved {len(results)} results ({len(successful_scores)} successful, avg: {avg_score:.3f})"
+            f"    Saved {len(results)} results ({len(successful_scores)} successful,"
+            f"avg: {avg_score:.3f})"
         )
     else:
         print(f"    Saved {len(results)} results (all failed)")
