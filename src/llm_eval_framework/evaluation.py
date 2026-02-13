@@ -90,9 +90,7 @@ def generate_outputs(config: EvaluationConfig):
             outputs = []
             for batch in dataset.iter(model_config.batch_size):
                 # NOTE: batch := indices, rows, prompts, answers
-                llm_outputs = llm_generation_wrapper.generate(
-                    batch[2], **sampling_params
-                )
+                llm_outputs = llm_generation_wrapper.generate(batch[2])
 
                 for i, row, prompt, answer, llm_output in zip(*batch, llm_outputs):
                     output = row.copy()
