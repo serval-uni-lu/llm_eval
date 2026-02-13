@@ -43,6 +43,7 @@ class EvaluationConfig(BaseModel):
     models: List[ModelConfig]
     datasets: List[DatasetConfig]
     judge_model: Optional[ModelConfig] = None
+    endpoint: Optional[str] = None
 
     @staticmethod
     def from_yaml(yaml_path: str | Path) -> "EvaluationConfig":

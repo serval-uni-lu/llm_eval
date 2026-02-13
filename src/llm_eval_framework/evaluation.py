@@ -63,7 +63,7 @@ def generate_outputs(config: EvaluationConfig):
             load_in_4bit=model_config.load_in_4bit,
             load_in_8bit=model_config.load_in_8bit,
             sampling_params=sampling_params,
-            endpoint="",
+            endpoint=config.endpoint,
         )
 
         for dataset_config in config.datasets:
@@ -173,7 +173,7 @@ def compute_metrics(config: EvaluationConfig):
         load_in_4bit=config.judge_model.load_in_4bit,
         load_in_8bit=config.judge_model.load_in_8bit,
         sampling_params=judge_sampling_params,
-        endpoint="",
+        endpoint=config.endpoint,
     )
 
     for model_config, dataset_config in product(config.models, config.datasets):
