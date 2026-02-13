@@ -84,11 +84,15 @@ class Dataset:
         return self.data[index]
 
     def iter(self, batch_size: int):
-        items = (
-            range(len(self)),
-            self.data.to_dict(orient="records"),
-            self.prompts,
-            self.answers or [None] * len(self),
+        items = list(
+            zip(
+                *(
+                    range(len(self)),
+                    self.data.to_dict(orient="records"),
+                    self.prompts,
+                    self.answers or [None] * len(self),
+                )
+            )
         )
         for start in range(0, len(self), batch_size):
             end = min(start + batch_size, len(self))
