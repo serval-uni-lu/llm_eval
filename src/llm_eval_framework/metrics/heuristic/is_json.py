@@ -1,6 +1,6 @@
 import json
 
-from src.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class IsJsonMetric(BaseMetric):
@@ -29,10 +29,7 @@ class IsJsonMetric(BaseMetric):
             # TODO: Add schema validation if self.schema is provided
             return MetricResult(
                 value=1.0,
-                details=f"Valid JSON object with {len(parsed) if isinstance(parsed, (dict, list)) else 'scalar'} items"
+                details=f"Valid JSON object with {len(parsed) if isinstance(parsed, (dict, list)) else 'scalar'} items",
             )
         except (json.JSONDecodeError, ValueError) as e:
-            return MetricResult(
-                value=0.0,
-                details=f"Invalid JSON: {str(e)}"
-            )
+            return MetricResult(value=0.0, details=f"Invalid JSON: {str(e)}")

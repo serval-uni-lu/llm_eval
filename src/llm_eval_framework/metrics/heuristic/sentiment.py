@@ -1,7 +1,7 @@
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-from src.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class SentimentMetric(BaseMetric):
@@ -12,7 +12,9 @@ class SentimentMetric(BaseMetric):
         super().__init__(name="sentiment")
 
         if SentimentIntensityAnalyzer is None:
-            raise ImportError("NLTK required for sentiment. Install with: pip install nltk")
+            raise ImportError(
+                "NLTK required for sentiment. Install with: pip install nltk"
+            )
 
         try:
             self.analyzer = SentimentIntensityAnalyzer()
@@ -27,16 +29,17 @@ class SentimentMetric(BaseMetric):
             output: The text to analyze
 
         Returns:
-            MetricResult with compound sentiment score (-1.0 to 1.0)
-            - Negative values indicate negative sentiment
-            - Positive values indicate positive sentiment
-            - Zero indicates neutral sentiment
+            MetricResult with compound sentiment score (0 to 1.0)
+            - 0.5 indicates neutral sentiment
+            - Values less than 0.5 indicate negative sentiment
+            - Values higher than 0.5 indicate positive sentiment
         """
         if not output.strip():
             return MetricResult(value=0.0, details={"error": "Empty output"})
 
         scores = self.analyzer.polarity_scores(output)
-        compound_score = scores["compound"]
+        # normalise `compound` score from (-1, 1) to (0, 1)
+        compound_score = (scores["compound"] + 1) / 2
 
         return MetricResult(
             value=compound_score,
@@ -44,6 +47,6 @@ class SentimentMetric(BaseMetric):
                 "positive": scores["pos"],
                 "negative": scores["neg"],
                 "neutral": scores["neu"],
-                "compound": compound_score
-            }
+                "compound": compound_score,
+            },
         )

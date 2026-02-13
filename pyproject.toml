@@ -1,0 +1,38 @@
+[project]
+name = "llm_eval_framework"
+version = "0.1.0"
+description = "A framework for evaluating LLMs with support for multiple metrics, datasets, and models."
+readme = "README.md"
+authors = [
+    { name = "François Frankart", email = "francois.frankart@uni.lu" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.10.0",
+    "bitsandbytes>=0.46.0",
+    "chonkie>=1.1.0",
+    "datasets>=4.0.0",
+    "docling>=2.47.0",
+    "docling-core>=2.45.0",
+    "docling-ibm-models>=3.9.0",
+    "docling-parse>=4.2.0",
+    "huggingface-hub>=0.34.0",
+    "loguru>=0.7.0",
+    "matplotlib>=3.10.8",
+    "munkres>=1.1.4",
+    "numpy>=2.3.0",
+    "pandas>=2.3.0",
+    "pyarrow>=21.0.0",
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.10.0",
+    "pyyaml>=6.0.0",
+    "rapidfuzz>=3.14.3",
+    "rouge-score>=0.1.2",
+    "safetensors>=0.6.0",
+    "sentencepiece>=0.2.0",
+    "tiktoken>=0.11.0",
+    "tokenizers>=0.21.0",
+    "torch>=2.7.0",
+    "tqdm>=4.67.0",
+    "transformers>=4.53.0",
+]

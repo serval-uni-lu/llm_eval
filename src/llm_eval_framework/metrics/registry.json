@@ -1,39 +1,39 @@
 {
   "heuristic": {
     "contains": {
-      "class": "src.metrics.heuristic.contains.ContainsMetric",
+      "class": "ContainsMetric",
       "description": "Check if output contains a substring"
     },
     "equals": {
-      "class": "src.metrics.heuristic.equals.EqualsMetric",
+      "class": "EqualsMetric",
       "description": "Check if output equals expected value"
     },
     "is_json": {
-      "class": "src.metrics.heuristic.is_json.IsJsonMetric",
+      "class": "IsJsonMetric",
       "description": "Check if output is valid JSON"
     },
     "regex_match": {
-      "class": "src.metrics.heuristic.regex_match.RegexMatchMetric",
+      "class": "RegexMatchMetric",
       "description": "Check if output matches a regular expression"
     },
     "levenshtein": {
-      "class": "src.metrics.heuristic.levenshtein.LevenshteinMetric",
+      "class": "LevenshteinMetric",
       "description": "Calculate normalized Levenshtein similarity"
     },
     "bleu": {
-      "class": "src.metrics.heuristic.bleu.BLEUMetric",
+      "class": "BLEUMetric",
       "description": "Calculate BLEU score for text generation"
     },
     "rouge": {
-      "class": "src.metrics.heuristic.rouge.ROUGEMetric",
+      "class": "ROUGEMetric",
       "description": "Calculate ROUGE score for summarization"
     },
     "sentiment": {
-      "class": "src.metrics.heuristic.sentiment.SentimentMetric",
+      "class": "SentimentMetric",
       "description": "Analyze sentiment polarity using VADER"
     },
     "anls": {
-      "class": "src.metrics.heuristic.anls.ANLSMetric",
+      "class": "ANLSMetric",
       "description": "Calculate ANLS score for structured data comparison"
     }
   },

@@ -1,9 +1,8 @@
 import json
 import yaml
-import importlib
 from pathlib import Path
 
-from src.metrics.base import BaseMetric
+from .base import BaseMetric
 
 
 def load_registry() -> dict:
@@ -35,9 +34,8 @@ def get_metric(name: str, **kwargs) -> BaseMetric:
     if name in registry.get("llm_judge", {}):
         return _load_llm_judge_metric(name, registry["llm_judge"][name], kwargs)
 
-    available_metrics = (
-        list(registry.get("heuristic", {}).keys()) +
-        list(registry.get("llm_judge", {}).keys())
+    available_metrics = list(registry.get("heuristic", {}).keys()) + list(
+        registry.get("llm_judge", {}).keys()
     )
     raise ValueError(
         f"Metric '{name}' not found in registry. "
@@ -56,12 +54,10 @@ def _load_heuristic_metric(name: str, config: dict, kwargs: dict) -> BaseMetric:
     Returns:
         BaseMetric instance
     """
-    class_path = config["class"]
-    module_path, class_name = class_path.rsplit(".", 1)
+    from . import heuristic
 
     # Import the class
-    module = importlib.import_module(module_path)
-    metric_class = getattr(module, class_name)
+    metric_class = getattr(heuristic, config["class"])
 
     # Instantiate with provided kwargs
     return metric_class(**kwargs)
@@ -78,7 +74,7 @@ def _load_llm_judge_metric(name: str, config: dict, kwargs: dict) -> BaseMetric:
     Returns:
         BaseMetric instance (GEval)
     """
-    from src.metrics.llm_judge.g_eval import GEval
+    from .llm_judge.g_eval import GEval
 
     # Load template configuration
     template_name = config["template"]
@@ -94,9 +90,9 @@ def _load_llm_judge_metric(name: str, config: dict, kwargs: dict) -> BaseMetric:
     # Create GEval instance with template config
     return GEval(
         name=name,
-        task_introduction=template_config['task_introduction'],
-        evaluation_criteria=template_config['evaluation_criteria'],
-        chain_of_thought=template_config['chain_of_thought'],
+        task_introduction=template_config["task_introduction"],
+        evaluation_criteria=template_config["evaluation_criteria"],
+        chain_of_thought=template_config["chain_of_thought"],
     )
 
 
@@ -116,5 +112,5 @@ def list_metrics() -> dict:
         "llm_judge": {
             name: config.get("description", "No description")
             for name, config in registry.get("llm_judge", {}).items()
-        }
+        },
     }

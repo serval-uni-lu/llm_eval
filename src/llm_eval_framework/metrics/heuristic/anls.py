@@ -2,7 +2,7 @@ import math
 import warnings
 from typing import Any, Tuple, List, Union
 
-from src.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 try:
     from munkres import Munkres, make_cost_matrix
@@ -25,7 +25,9 @@ class ANLSMetric(BaseMetric):
         super().__init__(name="anls")
 
         if Munkres is None:
-            raise ImportError("munkres required for ANLS. Install with: pip install munkres")
+            raise ImportError(
+                "munkres required for ANLS. Install with: pip install munkres"
+            )
 
     def score(self, output: Any, reference: Any) -> MetricResult:
         """Calculate ANLS score between output and reference.
@@ -38,7 +40,11 @@ class ANLSMetric(BaseMetric):
             MetricResult with ANLS score (0.0 to 1.0)
         """
         # Handle classical QA dataset compatibility
-        if isinstance(reference, list) and all(isinstance(x, str) for x in reference) and isinstance(output, str):
+        if (
+            isinstance(reference, list)
+            and all(isinstance(x, str) for x in reference)
+            and isinstance(output, str)
+        ):
             warnings.warn("Converting list reference to tuple for QA compatibility")
             reference = tuple(reference)
 
@@ -223,14 +229,18 @@ class ListNode(ANLSNode):
             matched_pred_idx.add(col)
 
         # Add unmatched ground truth items
-        unmatched_gt = [i for i in range(len(self.children)) if i not in {r for r, c in indices}]
+        unmatched_gt = [
+            i for i in range(len(self.children)) if i not in {r for r, c in indices}
+        ]
         for i in unmatched_gt:
             result_gt.append(self.children[i].obj)
 
         # Sort result_gt by original prediction order
-        sorted_pairs = [(gt, col) for (_, col), gt in zip(indices, result_gt[:len(indices)])]
+        sorted_pairs = [
+            (gt, col) for (_, col), gt in zip(indices, result_gt[: len(indices)])
+        ]
         sorted_pairs.sort(key=lambda x: x[1])
-        sorted_gt = [gt for gt, _ in sorted_pairs] + result_gt[len(indices):]
+        sorted_gt = [gt for gt, _ in sorted_pairs] + result_gt[len(indices) :]
 
         return result_nls, sorted_gt
 
@@ -266,12 +276,18 @@ class DictNode(ANLSNode):
         result_nls = []
         result_gt = {}
 
-        for k in list(self.children.keys()) + [k for k in other.children.keys() if k not in self.children]:
+        for k in list(self.children.keys()) + [
+            k for k in other.children.keys() if k not in self.children
+        ]:
             self_child = self.children.get(k, NoneNode())
             other_child = other.children.get(k, NoneNode())
 
             # Skip hallucinated None keys
-            if k not in self.children and k in other.children and _is_none_like(other_child.obj):
+            if (
+                k not in self.children
+                and k in other.children
+                and _is_none_like(other_child.obj)
+            ):
                 continue
 
             nls_list, chosen_gt = self_child.nls_list(other_child)
@@ -336,7 +352,9 @@ class LeafNode(ANLSNode):
                 if c1 == c2:
                     new_distances.append(distances[i1])
                 else:
-                    new_distances.append(1 + min(distances[i1], distances[i1 + 1], new_distances[-1]))
+                    new_distances.append(
+                        1 + min(distances[i1], distances[i1 + 1], new_distances[-1])
+                    )
             distances = new_distances
 
         return distances[-1]

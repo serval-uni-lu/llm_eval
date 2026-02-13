@@ -1,10 +1,12 @@
-from src.metrics.base import BaseMetric, MetricResult
+from ..base import BaseMetric, MetricResult
 
 
 class EqualsMetric(BaseMetric):
     """Metric that checks if output exactly equals an expected value."""
 
-    def __init__(self, expected: str = None, case_sensitive: bool = True, strip: bool = True):
+    def __init__(
+        self, expected: str = None, case_sensitive: bool = True, strip: bool = True
+    ):
         """Initialize EqualsMetric.
 
         Args:
@@ -30,7 +32,9 @@ class EqualsMetric(BaseMetric):
         expected_value = expected if expected is not None else self.expected
 
         if expected_value is None:
-            raise ValueError("Expected value must be provided either in constructor or score()")
+            raise ValueError(
+                "Expected value must be provided either in constructor or score()"
+            )
 
         # Process strings
         output_processed = output.strip() if self.strip else output
@@ -44,5 +48,5 @@ class EqualsMetric(BaseMetric):
 
         return MetricResult(
             value=1.0 if matches else 0.0,
-            details=f"Output {'matches' if matches else 'does not match'} expected value"
+            details=f"Output {'matches' if matches else 'does not match'} expected value",
         )

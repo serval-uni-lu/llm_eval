@@ -6,10 +6,13 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from .utils import clear_cuda_cache
+
 
 @dataclass
 class LLMOutput:
     """Output from LLM generation."""
+
     content: str
     logprobs: Optional[Dict[str, Any]] = None
 
@@ -20,7 +23,7 @@ class LLMOutput:
             Dictionary if valid JSON found, None otherwise
         """
         # Try to find JSON in the content
-        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
         matches = re.findall(json_pattern, self.content, re.DOTALL)
 
         for match in matches:
@@ -30,7 +33,7 @@ class LLMOutput:
                 continue
 
         # If no JSON found, try to extract from markdown code blocks
-        code_block_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+        code_block_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
         matches = re.findall(code_block_pattern, self.content, re.DOTALL)
 
         for match in matches:
@@ -67,12 +70,15 @@ class LLM:
         self.enable_compile = enable_compile
 
         # Configure torch._dynamo to prevent recompilation limit errors
-        if hasattr(torch, '_dynamo') and hasattr(torch._dynamo, 'config'):
+        if hasattr(torch, "_dynamo") and hasattr(torch._dynamo, "config"):
             # Increase cache size limit from default (8) to handle varying input sizes
             torch._dynamo.config.cache_size_limit = 256
 
             # Disable compilation if requested (via parameter or environment variable)
-            if not self.enable_compile or os.environ.get('DISABLE_TORCH_COMPILE', '0') == '1':
+            if (
+                not self.enable_compile
+                or os.environ.get("DISABLE_TORCH_COMPILE", "0") == "1"
+            ):
                 torch._dynamo.config.suppress_errors = True
 
         print(f"Loading model: {model_name} on {self.device}...")
@@ -81,6 +87,7 @@ class LLM:
         quantization_kwargs = {}
         if load_in_4bit or load_in_8bit:
             from transformers import BitsAndBytesConfig
+
             quantization_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=load_in_4bit,
                 load_in_8bit=load_in_8bit,
@@ -91,20 +98,17 @@ class LLM:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         # Configure tokenizer padding
-        self.tokenizer.padding_side = 'right'
+        self.tokenizer.padding_side = "right"
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        is_gemma3 = 'gemma-3' in model_name.lower()
+        is_gemma3 = "gemma-3" in model_name.lower()
         if self.device == "cuda" and not is_gemma3:
             dtype = torch.float16
         else:
             dtype = torch.float32
 
-        model_kwargs = {
-            "dtype": dtype,
-            **quantization_kwargs
-        }
+        model_kwargs = {"dtype": dtype, **quantization_kwargs}
 
         # Only use device_map for quantized models (required by bitsandbytes)
         # Regular models use .to(device) for cleaner memory management
@@ -114,56 +118,70 @@ class LLM:
         if not quantization_kwargs:
             self.model = self.model.to(self.device)
 
-        print(f"Model loaded successfully!")
+        print("Model loaded successfully!")
 
     def generate(
         self,
-        prompt: str,
+        prompts: str | List[str],
         max_new_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         topk_logprobs: Optional[int] = None,
-    ) -> LLMOutput:
-        """Generate response with optional sampling parameters.
+    ) -> List[LLMOutput]:
+        """Generate responses for a batch of prompts.
 
         Args:
-            prompt: Input prompt
+            prompts: either a single input (str) prompt or a List of input prompts
             max_new_tokens: Maximum tokens to generate (may be capped to fit context)
             temperature: Sampling temperature
             top_p: Nucleus sampling parameter
             topk_logprobs: Number of top log probabilities to return
 
         Returns:
-            LLMOutput with content and optional logprobs
+            List of LLMOutput objects (one per prompt)
         """
+        if not prompts:
+            return []
+
+        if isinstance(prompts, str):
+            prompts = [prompts]
+
         return_logprobs = topk_logprobs is not None
         requested_tokens = max_new_tokens if max_new_tokens is not None else 512
 
         # Get model's max context length
-        max_context = getattr(self.model.config, 'max_position_embeddings', None)
+        max_context = getattr(self.model.config, "max_position_embeddings", None)
         if max_context is None:
-            max_context = getattr(self.model.config, 'n_positions',
-                                  getattr(self.model.config, 'max_sequence_length', 8192))
+            max_context = getattr(
+                self.model.config,
+                "n_positions",
+                getattr(self.model.config, "max_sequence_length", 8192),
+            )
 
-        # Tokenize input
+        # Tokenize batch
         inputs = self.tokenizer(
-            [prompt],
+            prompts,
             return_tensors="pt",
+            padding=True,
         ).to(self.device)
 
-        input_length = inputs.input_ids.shape[1]
+        input_lengths = inputs.input_ids.ne(self.tokenizer.pad_token_id).sum(dim=1)
+        max_input_length = int(input_lengths.max())
 
-        # Cap max_new_tokens to fit within context window
-        available_tokens = max_context - input_length
+        # Cap max_new_tokens to fit context window (batch-wide)
+        available_tokens = max_context - max_input_length
         if available_tokens <= 0:
             raise ValueError(
-                f"Input length ({input_length}) exceeds model context ({max_context}). "
-                f"Cannot generate any tokens."
+                f"Longest input length ({max_input_length}) exceeds model context "
+                f"({max_context}). Cannot generate any tokens."
             )
 
         actual_max_tokens = min(requested_tokens, available_tokens)
         if actual_max_tokens < requested_tokens:
-            print(f"Capping max_new_tokens from {requested_tokens} to {actual_max_tokens} to fit context")
+            print(
+                f"Capping max_new_tokens from {requested_tokens} to "
+                f"{actual_max_tokens} to fit context"
+            )
 
         # Build generation kwargs
         gen_kwargs = {
@@ -184,22 +202,36 @@ class LLM:
         with torch.no_grad():
             outputs = self.model.generate(**inputs, **gen_kwargs)
 
-        # Decode generated text
-        generated_tokens = outputs.sequences[:, input_length:]
-        generated_text = self.tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+        sequences = outputs.sequences
+        results: List[LLMOutput] = []
 
-        # Compute logprobs if requested
-        logprobs_dict = None
-        if return_logprobs and outputs.scores:
-            logprobs_dict = self._compute_logprobs(
-                generated_tokens[0],
-                outputs.scores,
-                topk_logprobs
+        # Process each example independently
+        for i, input_len in enumerate(input_lengths.tolist()):
+            generated_tokens = sequences[i, input_len:]
+            generated_text = self.tokenizer.decode(
+                generated_tokens, skip_special_tokens=True
             )
 
-        return LLMOutput(content=generated_text, logprobs=logprobs_dict)
+            logprobs_dict = None
+            if return_logprobs and outputs.scores:
+                logprobs_dict = self._compute_logprobs(
+                    generated_tokens=generated_tokens,
+                    scores=outputs.scores[i],
+                    topk=(topk_logprobs or 0),
+                )
 
-    def _compute_logprobs(self, generated_tokens: torch.Tensor, scores: tuple, topk: int) -> Dict[str, Any]:
+            results.append(
+                LLMOutput(
+                    content=generated_text,
+                    logprobs=logprobs_dict,
+                )
+            )
+
+        return results
+
+    def _compute_logprobs(
+        self, generated_tokens: torch.Tensor, scores: tuple, topk: int
+    ) -> Dict[str, Any]:
         """Compute logprobs from generation scores.
 
         Args:
@@ -214,13 +246,15 @@ class LLM:
         transition_scores = self.model.compute_transition_scores(
             sequences=generated_tokens.unsqueeze(0),
             scores=scores,
-            normalize_logits=True
+            normalize_logits=True,
         )
 
         # Build content logprobs structure
         content_logprobs = []
 
-        for i, (token_id, score) in enumerate(zip(generated_tokens, transition_scores[0])):
+        for i, (token_id, score) in enumerate(
+            zip(generated_tokens, transition_scores[0])
+        ):
             token = self.tokenizer.decode(token_id)
             logprob = score.cpu().item()
 
@@ -229,30 +263,30 @@ class LLM:
             if i < len(scores) and topk > 0:
                 # Get top k+1 tokens (including the selected one)
                 log_probs = torch.log_softmax(scores[i][0], dim=-1)
-                top_k_values, top_k_indices = torch.topk(log_probs, k=min(topk + 1, log_probs.shape[-1]))
+                top_k_values, top_k_indices = torch.topk(
+                    log_probs, k=min(topk + 1, log_probs.shape[-1])
+                )
 
                 for val, idx in zip(top_k_values, top_k_indices):
                     if idx != token_id:
-                        top_logprobs.append({
-                            'token': self.tokenizer.decode(idx),
-                            'logprob': val.cpu().item()
-                        })
+                        top_logprobs.append(
+                            {
+                                "token": self.tokenizer.decode(idx),
+                                "logprob": val.cpu().item(),
+                            }
+                        )
                         if len(top_logprobs) >= topk:
                             break
 
-            content_logprobs.append({
-                'token': token,
-                'logprob': logprob,
-                'top_logprobs': top_logprobs
-            })
+            content_logprobs.append(
+                {"token": token, "logprob": logprob, "top_logprobs": top_logprobs}
+            )
 
-        return {'content': content_logprobs}
+        return {"content": content_logprobs}
 
     @staticmethod
     def list_cached_models(
-        sort_by: str = "size",
-        reverse: bool = True,
-        model_filter: Optional[str] = None
+        sort_by: str = "size", reverse: bool = True, model_filter: Optional[str] = None
     ) -> List[Dict[str, any]]:
         """List HuggingFace models cached locally.
 
@@ -264,14 +298,13 @@ class LLM:
         Returns:
             List of dicts with model info
         """
-        from src.model_cache import list_cached_models
+        from .model_cache import list_cached_models
+
         return list_cached_models(sort_by, reverse, model_filter)
 
     @staticmethod
     def print_cached_models(
-        sort_by: str = "size",
-        reverse: bool = True,
-        model_filter: Optional[str] = None
+        sort_by: str = "size", reverse: bool = True, model_filter: Optional[str] = None
     ) -> None:
         """Print cached HuggingFace models in a formatted table.
 
@@ -280,7 +313,8 @@ class LLM:
             reverse: Sort in descending order (default True)
             model_filter: Optional substring to filter model names
         """
-        from src.model_cache import print_cached_models
+        from .model_cache import print_cached_models
+
         print_cached_models(sort_by, reverse, model_filter)
 
     @staticmethod
@@ -290,7 +324,8 @@ class LLM:
         Returns:
             Total cache size in gigabytes
         """
-        from src.model_cache import get_cache_size
+        from .model_cache import get_cache_size
+
         return get_cache_size()
 
     def unload(self) -> None:
@@ -300,11 +335,11 @@ class LLM:
         import platform
 
         # Step 1: Delete model and tokenizer
-        if hasattr(self, 'model'):
+        if hasattr(self, "model"):
             del self.model
             self.model = None
 
-        if hasattr(self, 'tokenizer'):
+        if hasattr(self, "tokenizer"):
             del self.tokenizer
             self.tokenizer = None
 
@@ -325,4 +360,57 @@ class LLM:
         except Exception:
             pass
 
-        print(f"Model unloaded and memory freed")
+        print("Model unloaded and memory freed")
+
+
+class LLMGenerationWrapper:
+    def __init__(
+        self,
+        model_name,
+        load_in_4bit,
+        load_in_8bit,
+        sampling_params,
+        endpoint,
+        enable_compile=True,
+    ):
+        self.model_section = dict(
+            model_name=model_name, load_in_4bit=load_in_4bit, load_in_8bit=load_in_8bit
+        )
+
+        self.sampling_params = sampling_params
+        self.endpoint = endpoint
+        self.is_remote = (
+            endpoint is not None and isinstance(endpoint, str) and endpoint.strip()
+        )
+        if self.is_remote:
+            self.llm = None
+        else:
+            self.llm = LLM(**self.model_section)
+
+    def _generate_from_remote(self, endpoint: str, model: dict, prompts: dict):
+        import requests
+
+        payload = {
+            "model": model,
+            "prompt": prompts,
+        }
+
+        resp = requests.post(endpoint, json=payload)
+        return resp.json()
+
+    def generate(self, prompts: str | list[str]):
+        prompts_d = {"prompts": prompts, **self.sampling_params}
+
+        if self.is_remote:
+            llm_outputs = self._generate_from_remote(
+                self.endpoint, self.model_section, prompts_d
+            )
+            return [LLMOutput(**outputs) for outputs in llm_outputs]
+        else:
+            outputs = self.llm.generate(**prompts_d)
+            clear_cuda_cache()
+            return outputs
+
+    def unload(self):
+        if self.llm is not None:
+            self.llm.unload()

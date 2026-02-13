@@ -2,13 +2,14 @@ import inspect
 from typing import Optional
 from dataclasses import dataclass
 
-from src.llm import LLM
-from src.metrics.base import MetricResult
+from ..llm import LLM
+from .base import MetricResult
 
 
 @dataclass
 class ParsedArgs:
     """Parsed metric arguments with semantic meaning."""
+
     output: Optional[str] = None
     input: Optional[str] = None
     reference: Optional[str] = None
@@ -37,7 +38,7 @@ class Metric:
             name: Metric name from registry
             **config: Metric-specific configuration
         """
-        from src.metrics.loader import get_metric, load_registry
+        from .loader import get_metric, load_registry
 
         self._name = name
         self._metric = get_metric(name, **config)
@@ -46,9 +47,9 @@ class Metric:
 
     def _detect_type(self, registry: dict) -> str:
         """Detect if this is a judge or heuristic metric."""
-        if self._name in registry.get('llm_judge', {}):
-            return 'judge'
-        return 'heuristic'
+        if self._name in registry.get("llm_judge", {}):
+            return "judge"
+        return "heuristic"
 
     def score(self, *args, **kwargs) -> MetricResult:
         """Flexible scoring API.
@@ -79,7 +80,7 @@ class Metric:
 
         parsed = ParsedArgs(llm=llm)
 
-        if self._type == 'judge':
+        if self._type == "judge":
             if len(strings) >= 1:
                 parsed.input = strings[0]
             if len(strings) >= 2:
@@ -93,43 +94,53 @@ class Metric:
                 parsed.reference = strings[1]
 
         for key, value in kwargs.items():
-            if key == 'input':
+            if key == "input":
                 parsed.input = value
-            elif key == 'output':
+            elif key == "output":
                 parsed.output = value
-            elif key in ('reference', 'substring', 'expected', 'pattern'):
+            elif key in ("reference", "substring", "expected", "pattern"):
                 parsed.reference = value
-            elif key == 'llm':
+            elif key == "llm":
                 parsed.llm = value
 
         return parsed
 
-    def _call_with_parsed(self, parsed: ParsedArgs, original_kwargs: dict = None) -> MetricResult:
+    def _call_with_parsed(
+        self, parsed: ParsedArgs, original_kwargs: dict = None
+    ) -> MetricResult:
         """Map parsed args to native signature and call metric."""
         call_kwargs = {}
         if original_kwargs is None:
             original_kwargs = {}
 
         # Known parameter names that are handled by ParsedArgs
-        known_params = {'output', 'input', 'reference', 'llm', 'substring', 'expected', 'pattern'}
+        known_params = {
+            "output",
+            "input",
+            "reference",
+            "llm",
+            "substring",
+            "expected",
+            "pattern",
+        }
 
         for param_name, param in self._signature.parameters.items():
-            if param_name == 'self':
+            if param_name == "self":
                 continue
 
-            if param_name == 'output' and parsed.output is not None:
-                call_kwargs['output'] = parsed.output
-            elif param_name == 'input' and parsed.input is not None:
-                call_kwargs['input'] = parsed.input
-            elif param_name == 'reference' and parsed.reference is not None:
-                call_kwargs['reference'] = parsed.reference
-            elif param_name == 'llm' and parsed.llm is not None:
-                call_kwargs['llm'] = parsed.llm
-            elif param_name == 'substring' and parsed.reference is not None:
-                call_kwargs['substring'] = parsed.reference
-            elif param_name == 'expected' and parsed.reference is not None:
-                call_kwargs['expected'] = parsed.reference
-            elif param_name == 'pattern' and param.default != inspect.Parameter.empty:
+            if param_name == "output" and parsed.output is not None:
+                call_kwargs["output"] = parsed.output
+            elif param_name == "input" and parsed.input is not None:
+                call_kwargs["input"] = parsed.input
+            elif param_name == "reference" and parsed.reference is not None:
+                call_kwargs["reference"] = parsed.reference
+            elif param_name == "llm" and parsed.llm is not None:
+                call_kwargs["llm"] = parsed.llm
+            elif param_name == "substring" and parsed.reference is not None:
+                call_kwargs["substring"] = parsed.reference
+            elif param_name == "expected" and parsed.reference is not None:
+                call_kwargs["expected"] = parsed.reference
+            elif param_name == "pattern" and param.default != inspect.Parameter.empty:
                 continue
             elif param.default != inspect.Parameter.empty:
                 continue

@@ -5,7 +5,7 @@ A framework for evaluating LLMs with support for multiple metrics, datasets, and
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+uv pip install "git+https://github.com/serval-uni-lu/llm_eval"
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ pip install -r requirements.txt
 ### LLM Generation
 
 ```python
-from src.llm import LLM
+from llm_eval_framework.llm import LLM
 
 llm = LLM('google/gemma-3-4b-it')
 output = llm.generate("Your prompt here", temperature=0.7, top_p=0.9)
@@ -26,7 +26,7 @@ llm.unload()
 Datasets require three files: `data.parquet`, `metadata.json`, and `prompt.yaml`.
 
 ```python
-from src.dataset import Dataset
+from llm_eval_framework.dataset import Dataset
 
 dataset = Dataset.from_path('path/to/dataset')
 print(dataset.prompts[0])
@@ -38,8 +38,8 @@ print(dataset.answers[0])
 Supports heuristic metrics (`is_json`, `contains`, `bleu`, `rouge`, etc.) and LLM-judge metrics (`answer_correctness`, `bias`, `safety`, etc.).
 
 ```python
-from src.llm import LLM
-from src.metrics import Metric
+from llm_eval_framework.llm import LLM
+from llm_eval_framework.metrics import Metric
 
 llm = LLM('meta-llama/Llama-3.2-3B-Instruct')
 
@@ -78,7 +78,7 @@ judge_model:
 Run evaluation:
 
 ```python
-from src.evaluation import EvaluationConfig, run_evaluation
+from llm_eval_framework.evaluation import EvaluationConfig, run_evaluation
 
 config = EvaluationConfig.from_yaml("eval_config.yaml")
 results = run_evaluation(config)
@@ -89,7 +89,7 @@ results = run_evaluation(config)
 Parse PDFs to markdown using Docling:
 
 ```python
-from src.parser import Parser
+from llm_eval_framework.parser import Parser
 
 parser = Parser()
 markdown_files = parser.parse('input_dir', 'output_dir')
@@ -98,7 +98,7 @@ markdown_files = parser.parse('input_dir', 'output_dir')
 ### Semantic Chunking
 
 ```python
-from src.chunker import Chunker
+from llm_eval_framework.chunker import Chunker
 
 chunker = Chunker()
 chunks = chunker.chunk(text)
@@ -107,7 +107,7 @@ chunks = chunker.chunk(text)
 ### Visualization
 
 ```python
-from src.visualization import save_results_plot
+from llm_eval_framework.visualization import save_results_plot
 
 save_results_plot(output_dir='path/to/results', save_path='plot.png')
 ```
