@@ -295,7 +295,7 @@ def _compute_batched_judge_metric(
     raw_outputs = llm_judge_generation_wrapper.generate(prompts)
 
     batch_results = []
-    for raw_output, output in enumerate(raw_outputs, batch):
+    for raw_output, output in zip(raw_outputs, batch):
         try:
             result_metric = metric.parse_model_output(raw_output)
             result = {"score": result_metric.value, "details": result_metric.details}
