@@ -36,3 +36,6 @@ dependencies = [
     "tqdm>=4.67.0",
     "transformers>=4.53.0",
 ]
+
+[tool.setuptools.package-data]
+"src" = ["*.json"]
