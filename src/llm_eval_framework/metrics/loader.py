@@ -1,4 +1,3 @@
-import json
 import yaml
 from pathlib import Path
 
@@ -11,9 +10,9 @@ def load_registry() -> dict:
     Returns:
         Dictionary with 'heuristic' and 'llm_judge' sections
     """
-    registry_path = Path(__file__).parent / "registry.json"
-    with open(registry_path) as f:
-        return json.load(f)
+    from .registry import REGISTRY
+
+    return REGISTRY
 
 
 def get_metric(name: str, **kwargs) -> BaseMetric:

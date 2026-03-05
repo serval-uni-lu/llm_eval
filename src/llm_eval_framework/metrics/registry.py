@@ -1,0 +1,62 @@
+REGISTRY = {
+    "heuristic": {
+        "contains": {
+            "class": "ContainsMetric",
+            "description": "Check if output contains a substring",
+        },
+        "equals": {
+            "class": "EqualsMetric",
+            "description": "Check if output equals expected value",
+        },
+        "is_json": {
+            "class": "IsJsonMetric",
+            "description": "Check if output is valid JSON",
+        },
+        "regex_match": {
+            "class": "RegexMatchMetric",
+            "description": "Check if output matches a regular expression",
+        },
+        "levenshtein": {
+            "class": "LevenshteinMetric",
+            "description": "Calculate normalized Levenshtein similarity",
+        },
+        "bleu": {
+            "class": "BLEUMetric",
+            "description": "Calculate BLEU score for text generation",
+        },
+        "rouge": {
+            "class": "ROUGEMetric",
+            "description": "Calculate ROUGE score for summarization",
+        },
+        "sentiment": {
+            "class": "SentimentMetric",
+            "description": "Analyze sentiment polarity using VADER",
+        },
+        "anls": {
+            "class": "ANLSMetric",
+            "description": "Calculate ANLS score for structured data comparison",
+        },
+    },
+    "llm_judge": {
+        "factual_accuracy": {
+            "template": "factual_accuracy.yaml",
+            "description": "Evaluate factual accuracy using LLM judge",
+        },
+        "answer_correctness": {
+            "template": "answer_correctness.yaml",
+            "description": "Evaluate answer correctness using LLM judge",
+        },
+        "bias": {
+            "template": "bias.yaml",
+            "description": "Evaluate potential biases using LLM judge",
+        },
+        "safety": {
+            "template": "safety.yaml",
+            "description": "Evaluate content safety using LLM judge",
+        },
+        "instruction_following": {
+            "template": "instruction_following.yaml",
+            "description": "Evaluate how well output follows explicit instructions",
+        },
+    },
+}
