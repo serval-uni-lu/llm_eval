@@ -208,6 +208,7 @@ def compute_metrics_in_batches(
     batch_size,
     metric_name,
     llm_judge_generation_wrapper: LLMGenerationWrapper | None = None,
+    return_all_scores: bool = False,
 ) -> list[dict]:
     metric_types = list_metrics()
     heuristic_metrics = set(metric_types["heuristic"].keys())
@@ -261,7 +262,10 @@ def compute_metrics_in_batches(
         else:
             valid_results.append(result)
 
-    return valid_results
+    if return_all_scores:
+        return all_results
+    else:
+        return valid_results
 
 
 def _compute_batched_heuristic_metric(metric, batch, **kwargs) -> list[dict]:
