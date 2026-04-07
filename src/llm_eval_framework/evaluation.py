@@ -7,8 +7,7 @@ from pathlib import Path
 from .llm import LLMGenerationWrapper
 from .dataset import Dataset
 from .decorators import retry_batches
-from .metrics import list_metrics
-from .metrics.loader import get_metric
+from .metrics import Metric, list_metrics
 from .utils import get_items, normalize_text, ensure_dir, clear_cuda_cache
 from .basemodels import ModelConfig, DatasetConfig, EvaluationConfig
 
@@ -212,18 +211,18 @@ def compute_metrics_in_batches(
     return_all_scores: bool = False,
     **metric_kwargs,
 ) -> list[dict]:
-    metric = get_metric(metric_name, **metric_kwargs)
+    metric = Metric(metric_name)
 
     metric_types = list_metrics()
     heuristic_metrics = set(metric_types["heuristic"].keys())
     is_heuristic = metric_name in heuristic_metrics
 
     _compute_batched = (
-        partial(_compute_batched_heuristic_metric, metric=metric)
+        partial(_compute_batched_heuristic_metric, metric=metric, **metric_kwargs)
         if is_heuristic
         else partial(
             _compute_batched_judge_metric,
-            metric=metric,
+            metric=metric._metric,
             llm_judge_generation_wrapper=llm_judge_generation_wrapper,
         )
     )
@@ -269,11 +268,13 @@ def compute_metrics_in_batches(
     return valid_results
 
 
-def _compute_batched_heuristic_metric(metric, batch, **kwargs) -> list[dict]:
+def _compute_batched_heuristic_metric(metric: Metric, batch, **kwargs) -> list[dict]:
     batch_results = []
     for output in batch:
         try:
-            result_metric = metric.score(output.get("response"), output.get("answer"))
+            result_metric = metric.score(
+                output.get("response"), output.get("answer"), **kwargs
+            )
             result = {"score": result_metric.value, "details": result_metric.details}
         except Exception as e:
             result = {
