@@ -211,14 +211,14 @@ def compute_metrics_in_batches(
     return_all_scores: bool = False,
     **metric_kwargs,
 ) -> list[dict]:
-    metric = Metric(metric_name)
+    metric = Metric(metric_name, **metric_kwargs)
 
     metric_types = list_metrics()
     heuristic_metrics = set(metric_types["heuristic"].keys())
     is_heuristic = metric_name in heuristic_metrics
 
     _compute_batched = (
-        partial(_compute_batched_heuristic_metric, metric=metric, **metric_kwargs)
+        partial(_compute_batched_heuristic_metric, metric=metric)
         if is_heuristic
         else partial(
             _compute_batched_judge_metric,
@@ -268,13 +268,11 @@ def compute_metrics_in_batches(
     return valid_results
 
 
-def _compute_batched_heuristic_metric(metric: Metric, batch, **kwargs) -> list[dict]:
+def _compute_batched_heuristic_metric(metric: Metric, batch) -> list[dict]:
     batch_results = []
     for output in batch:
         try:
-            result_metric = metric.score(
-                output.get("response"), output.get("answer"), **kwargs
-            )
+            result_metric = metric.score(output.get("response"), output.get("answer"))
             result = {"score": result_metric.value, "details": result_metric.details}
         except Exception as e:
             result = {
