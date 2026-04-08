@@ -29,6 +29,7 @@ class ROUGEMetric(BaseMetric):
 
         self.rouge_type = rouge_type
         self.scorer = rouge_scorer.RougeScorer([rouge_type], use_stemmer=use_stemmer)
+        self.use_stemmer = use_stemmer
 
     def score(self, output: str, reference: Union[str, List[str]]) -> MetricResult:
         """Calculate ROUGE score between output and reference(s).
@@ -61,6 +62,6 @@ class ROUGEMetric(BaseMetric):
             value=value,
             details={
                 "rouge_type": self.rouge_type,
-                "use_stemmer": self.scorer.use_stemmer,
+                "use_stemmer": self.use_stemmer,
             },
         )
